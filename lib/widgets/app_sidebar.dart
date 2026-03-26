@@ -155,7 +155,7 @@ class AppSidebar extends StatelessWidget {
                                         context: context,
                                         isDark: isDark,
                                         label: 'Light',
-                                        selected: prefs?.theme == 'light' || prefs?.theme == 'system',
+                                        selected: prefs?.theme == 'light',
                                         icon: Icons.wb_sunny_rounded,
                                         onTap: () => prefsVM.updateTheme('light'),
                                       ),

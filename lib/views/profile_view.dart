@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/user_profile_model.dart';
 import '../navigation/app_page_routes.dart';
-import '../theme/app_colors.dart';
+import '../theme/growductive_chrome.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/user_preferences_viewmodel.dart';
 import 'profile_edit_view.dart';
@@ -24,7 +24,7 @@ class ProfileView extends StatelessWidget {
     final authVM = Provider.of<AuthViewModel>(context);
 
     return Scaffold(
-      backgroundColor: AppColors.base,
+      backgroundColor: context.chrome.scaffoldBackground,
       body: StreamBuilder<UserProfileModel?>(
         stream: authVM.currentUserProfileStream,
         builder: (context, snapshot) {

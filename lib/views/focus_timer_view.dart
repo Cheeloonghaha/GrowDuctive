@@ -5,23 +5,17 @@ import 'package:provider/provider.dart';
 
 import '../models/focus_session_model.dart';
 import '../models/focus_timer_model.dart';
-import '../theme/app_colors.dart';
+import '../theme/growductive_chrome.dart';
 import '../navigation/sidebar_drawer_controller.dart';
 import '../viewmodels/focus_timer_viewmodel.dart';
 
 class FocusTimerView extends StatelessWidget {
   const FocusTimerView({super.key});
 
-  // Match task_view category bar + Tasks/Overdue segment styling.
-  static const Color _barOuter = Color(0xFFD6E6FF);
-  static const Color _barSelectedFill = Color(0xFFEAF3FF);
-  static const Color _barSelectedBorder = Color(0xFFB6D3FF);
-  static const Color _barText = Color(0xFF103A8A);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.base,
+      backgroundColor: context.chrome.scaffoldBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -64,9 +58,9 @@ class FocusTimerView extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
-    // Must match `MainShell` bottom-nav colors for consistent look.
-    const navBg = Color(0xFFEAF3FF); // light blue header background
-    const navBlue = Color(0xFF103A8A); // darker blue for title/icon
+    final chrome = context.chrome;
+    final navBg = chrome.headerBar;
+    final navBlue = chrome.navBlue;
     const menuCircleBg = Color(0xFF0F2E5C); // dark circle for menu button
     const double subtitleFontSize = 12.0;
     const double subtitleLineHeight = 1.2;
@@ -81,7 +75,7 @@ class FocusTimerView extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+              color: chrome.headerShadow.withValues(alpha: 0.35),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -329,13 +323,14 @@ class FocusTimerView extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: _barOuter,
+                  color: context.chrome.segmentOuter,
                   borderRadius: BorderRadius.circular(25),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: _phaseSegment(
+                        context: context,
                         label: 'Focus',
                         selected: isFocus,
                         compact: compact,
@@ -346,6 +341,7 @@ class FocusTimerView extends StatelessWidget {
                     ),
                     Expanded(
                       child: _phaseSegment(
+                        context: context,
                         label: 'Short break',
                         selected: isShort,
                         compact: compact,
@@ -356,6 +352,7 @@ class FocusTimerView extends StatelessWidget {
                     ),
                     Expanded(
                       child: _phaseSegment(
+                        context: context,
                         label: 'Long break',
                         selected: isLong,
                         compact: compact,
@@ -381,7 +378,7 @@ class FocusTimerView extends StatelessWidget {
                   style: TextStyle(
                     fontSize: constraints.maxWidth < 320 ? 40 : 52,
                     fontWeight: FontWeight.bold,
-                    color: _barText,
+                    color: context.chrome.navBlue,
                   ),
                 ),
               );
@@ -398,7 +395,7 @@ class FocusTimerView extends StatelessWidget {
                   ? ((vm.currentPhaseDuration - vm.remainingSeconds) / vm.currentPhaseDuration).clamp(0.0, 1.0)
                   : 0,
               backgroundColor: Colors.grey[300],
-              valueColor: const AlwaysStoppedAnimation<Color>(_barText),
+              valueColor: AlwaysStoppedAnimation<Color>(context.chrome.navBlue),
             ),
           ),
           const SizedBox(height: 24),
@@ -409,13 +406,14 @@ class FocusTimerView extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: _barOuter,
+                  color: context.chrome.segmentOuter,
                   borderRadius: BorderRadius.circular(25),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: _actionSegment(
+                        context: context,
                         icon: vm.isRunning
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
@@ -433,6 +431,7 @@ class FocusTimerView extends StatelessWidget {
                     ),
                     Expanded(
                       child: _actionSegment(
+                        context: context,
                         icon: Icons.refresh_rounded,
                         label: 'Reset',
                         onTap: () => Provider.of<FocusTimerViewModel>(context, listen: false)
@@ -461,17 +460,17 @@ class FocusTimerView extends StatelessWidget {
                     'Focus Sessions Today',
                     style: TextStyle(
                       fontSize: 13,
-                      color: _barText.withValues(alpha: 0.75),
+                      color: context.chrome.navBlue.withValues(alpha: 0.75),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '$count',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: _barText,
+                      color: context.chrome.navBlue,
                     ),
                   ),
                 ],
@@ -504,7 +503,7 @@ class FocusTimerView extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: _barText,
+                        color: context.chrome.navBlue,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -513,7 +512,7 @@ class FocusTimerView extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: _barText,
+                        color: context.chrome.navBlue,
                       ),
                     ),
                   ],
@@ -622,11 +621,13 @@ class FocusTimerView extends StatelessWidget {
 
   /// Single segment inside the phase bar (task_view category chip style).
   Widget _phaseSegment({
+    required BuildContext context,
     required String label,
     required bool selected,
     required VoidCallback onTap,
     bool compact = false,
   }) {
+    final chrome = context.chrome;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -637,10 +638,10 @@ class FocusTimerView extends StatelessWidget {
           vertical: 10,
         ),
         decoration: BoxDecoration(
-          color: selected ? _barSelectedFill : Colors.transparent,
+          color: selected ? chrome.segmentSelectedFill : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: selected
-              ? Border.all(color: _barSelectedBorder, width: 2)
+              ? Border.all(color: chrome.segmentBorder, width: 2)
               : null,
         ),
         alignment: Alignment.center,
@@ -652,7 +653,7 @@ class FocusTimerView extends StatelessWidget {
           style: TextStyle(
             fontSize: compact ? 11 : 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: _barText,
+            color: chrome.navBlue,
             height: 1.05,
           ),
         ),
@@ -662,10 +663,12 @@ class FocusTimerView extends StatelessWidget {
 
   /// Start/Pause and Reset — identical pill style (task_view selected segment).
   Widget _actionSegment({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required VoidCallback onTap,
   }) {
+    final chrome = context.chrome;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -673,20 +676,20 @@ class FocusTimerView extends StatelessWidget {
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: _barSelectedFill,
+          color: chrome.segmentSelectedFill,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _barSelectedBorder, width: 2),
+          border: Border.all(color: chrome.segmentBorder, width: 2),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: _barText, size: 20),
+            Icon(icon, color: chrome.navBlue, size: 20),
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
-                color: _barText,
+              style: TextStyle(
+                color: chrome.navBlue,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
                 height: 1.0,
@@ -722,9 +725,9 @@ class _CustomTimersSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.base,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.chrome.scaffoldBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         left: 16,

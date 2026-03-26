@@ -10,6 +10,7 @@ import '../models/category_model.dart';
 import '../models/user_preferences_model.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import '../theme/growductive_chrome.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_section_header.dart';
 import '../widgets/calendar_week_strip.dart';
@@ -88,7 +89,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         clipBehavior: Clip.none,
         children: [
           Scaffold(
-            backgroundColor: AppColors.base,
+            backgroundColor: context.chrome.scaffoldBackground,
             body: SafeArea(
               child: Column(
                 children: [
@@ -117,9 +118,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   // ==================== HEADER ====================
   Widget _buildHeader() {
     final theme = Theme.of(context);
-    // Must match `MainShell` bottom-nav colors for consistent look.
-    const navBg = Color(0xFFEAF3FF); // light blue bar background
-    const navBlue = Color(0xFF103A8A); // darker blue for title/icon
+    final chrome = context.chrome;
+    final navBg = chrome.headerBar;
+    final navBlue = chrome.navBlue;
     const menuCircleBg = Color(0xFF0F2E5C); // dark circle for menu button
     const double subtitleFontSize = 12.0;
     const double subtitleLineHeight = 1.2;
@@ -135,7 +136,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+              color: chrome.headerShadow.withValues(alpha: 0.35),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -308,6 +309,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
             return StreamBuilder<List<CategoryModel>>(
               stream: _categoriesStream,
               builder: (context, categorySnapshot) {
+                final chrome = context.chrome;
                 final categories = categorySnapshot.data ?? [];
                 final categoryMap = {for (var c in categories) c.id: c.name};
 
@@ -362,7 +364,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                               child: Container(
                                 padding: const EdgeInsets.all(3),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFD6E6FF), // outer pill
+                                  color: chrome.segmentOuter,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: ListView.builder(
@@ -393,23 +395,23 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                   vertical: 5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFD6E6FF),
+                                  color: chrome.segmentOuter,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
-                                  children: const [
+                                  children: [
                                     Text(
                                       'More',
                                       style: TextStyle(
-                                        color: Color(0xFF103A8A),
+                                        color: chrome.navBlue,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    SizedBox(width: 3),
+                                    const SizedBox(width: 3),
                                     Icon(Icons.arrow_drop_down,
-                                        color: Color(0xFF103A8A), size: 17),
+                                        color: chrome.navBlue, size: 17),
                                   ],
                                 ),
                               ),
@@ -425,10 +427,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     // Surface-backed week strip + category picker, kept in-place via
                     // spacing compensation (see constants below).
                     Container(
-                      color: AppColors.base,
+                      color: chrome.scaffoldBackground,
                       child: Builder(
                         builder: (context) {
-                          const navBlue = Color(0xFF103A8A);
+                          final navBlue = chrome.navBlue;
                           return Theme(
                             data: Theme.of(context).copyWith(
                               colorScheme: Theme.of(context).colorScheme.copyWith(
@@ -505,10 +507,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildTaskListSegmentControl() {
-    const outerBg = Color(0xFFD6E6FF);
-    const selectedBg = Color(0xFFEAF3FF);
-    const selectedBorder = Color(0xFFB6D3FF);
-    const navBlue = Color(0xFF103A8A);
+    final chrome = context.chrome;
+    final outerBg = chrome.segmentOuter;
+    final selectedBg = chrome.segmentSelectedFill;
+    final selectedBorder = chrome.segmentBorder;
+    final navBlue = chrome.navBlue;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -904,8 +907,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   Widget _buildAddButton(BuildContext context, TaskViewModel taskVM) {
     // Match `CalendarSpeedDial` main FAB (calendar_view): navBlue fill, navBg icon, faded border.
     // Position comes from parent `Stack` + `Positioned` (same as calendar).
-    const navBlue = Color(0xFF103A8A);
-    const navBg = Color(0xFFEAF3FF);
+    final chrome = context.chrome;
+    final navBlue = chrome.navBlue;
+    final navBg = chrome.headerBar;
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: Theme.of(context).colorScheme.copyWith(
@@ -1131,21 +1135,27 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.base,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.borderSubtle),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.schedule_rounded, size: 13, color: Colors.grey[700]),
+                          Icon(
+                            Icons.schedule_rounded,
+                            size: 13,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${task.duration} min',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: Colors.grey[800],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -3602,10 +3612,11 @@ class _CategoryChipState extends State<_CategoryChip> with SingleTickerProviderS
 
   @override
   Widget build(BuildContext context) {
-    const selectedBg = Color(0xFFEAF3FF); // selected pill fill (lighter)
-    const selectedBorder = Color(0xFFB6D3FF); // subtle border
+    final chrome = context.chrome;
+    final selectedBg = chrome.segmentSelectedFill;
+    final selectedBorder = chrome.segmentBorder;
     const unselectedBg = Colors.transparent; // unselected = just text on outer pill
-    const navBlue = Color(0xFF103A8A); // text
+    final navBlue = chrome.navBlue;
     return MouseRegion(
       onEnter: (_) {
         setState(() => _isHovered = true);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_colors.dart';
+import '../theme/growductive_chrome.dart';
 import '../viewmodels/auth_viewmodel.dart';
 
 /// Temporary demo screen to set up all profile fields.
@@ -87,7 +87,7 @@ class _ProfileEditViewState extends State<ProfileEditView> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasError) {
           return Scaffold(
-            backgroundColor: AppColors.base,
+            backgroundColor: context.chrome.scaffoldBackground,
             appBar: AppBar(
               title: const Text('Edit Profile'),
             ),
@@ -97,7 +97,7 @@ class _ProfileEditViewState extends State<ProfileEditView> {
           );
         }
         return Scaffold(
-          backgroundColor: AppColors.base,
+          backgroundColor: context.chrome.scaffoldBackground,
           appBar: AppBar(
             title: const Text('Edit Profile'),
           ),

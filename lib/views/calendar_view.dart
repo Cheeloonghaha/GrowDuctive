@@ -12,6 +12,7 @@ import '../models/category_model.dart';
 import '../services/smart_schedule_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import '../theme/growductive_chrome.dart';
 import '../widgets/calendar_speed_dial.dart';
 import '../widgets/calendar_week_strip.dart';
 import '../widgets/schedule_preview_dialog.dart';
@@ -136,14 +137,15 @@ class _CalendarViewState extends State<CalendarView> {
 
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     const fabEdge = FabLayout.edge;
-    const navBlue = Color(0xFF103A8A); // darker blue used in header
-    const navBg = Color(0xFFEAF3FF);
+    final chrome = context.chrome;
+    final navBlue = chrome.navBlue;
+    final navBg = chrome.headerBar;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Scaffold(
-          backgroundColor: AppColors.base,
+          backgroundColor: chrome.scaffoldBackground,
           body: SafeArea(
             child: Column(
               children: [
@@ -199,7 +201,7 @@ class _CalendarViewState extends State<CalendarView> {
       listen: false,
     );
 
-    const navBlue = Color(0xFF103A8A);
+    final navBlue = context.chrome.navBlue;
 
     return StreamBuilder<UserPreferencesModel?>(
       stream: prefsVM.preferencesStream,
@@ -219,7 +221,7 @@ class _CalendarViewState extends State<CalendarView> {
                 ),
           ),
           child: Container(
-            color: AppColors.base,
+            color: context.chrome.scaffoldBackground,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             child: FutureBuilder<Map<DateTime, List<ScheduledTaskModel>>>(
               key: ValueKey(
@@ -258,9 +260,9 @@ class _CalendarViewState extends State<CalendarView> {
 
   Widget _buildHeader(ScheduledTaskViewModel scheduledVM) {
     final theme = Theme.of(context);
-    // Must match `MainShell` bottom-nav colors for consistent look.
-    const navBg = Color(0xFFEAF3FF); // light blue header background
-    const navBlue = Color(0xFF103A8A); // darker blue for title/icon
+    final chrome = context.chrome;
+    final navBg = chrome.headerBar;
+    final navBlue = chrome.navBlue;
     const menuCircleBg = Color(0xFF0F2E5C); // dark circle for menu button
     const double subtitleFontSize = 12.0;
     const double subtitleLineHeight = 1.2;
@@ -275,7 +277,7 @@ class _CalendarViewState extends State<CalendarView> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+              color: chrome.headerShadow.withValues(alpha: 0.35),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),

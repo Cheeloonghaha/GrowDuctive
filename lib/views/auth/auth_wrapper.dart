@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/growductive_chrome.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/task_viewmodel.dart';
 import '../../viewmodels/scheduled_task_viewmodel.dart';
@@ -37,7 +37,7 @@ class AuthWrapper extends StatelessWidget {
         // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            backgroundColor: AppColors.base,
+            backgroundColor: context.chrome.scaffoldBackground,
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

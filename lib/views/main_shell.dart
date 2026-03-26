@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/app_colors.dart';
+import '../theme/growductive_chrome.dart';
 import 'analytics_view.dart';
 import 'calendar_view.dart';
 import 'focus_timer_view.dart';
@@ -21,16 +21,12 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  static const Color _navBackground = Color(0xFFEAF3FF); // light blue bar
-  static const Color _activeBlue = Color(0xFF103A8A); // selected icon/label
-  static const Color _inactiveIcon = Color(0xFF7C93B8);
-  static const Color _inactiveLabel = Color(0xFF90A7CC);
-
   @override
   Widget build(BuildContext context) {
+    final chrome = context.chrome;
     return Scaffold(
       key: SidebarDrawerController.scaffoldKey,
-      backgroundColor: AppColors.base,
+      backgroundColor: chrome.scaffoldBackground,
       extendBody: true,
       body: IndexedStack(
         index: _selectedIndex,
@@ -57,17 +53,18 @@ class _MainShellState extends State<MainShell> {
   Widget _buildBottomNav(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final showLabels = w >= 340;
+    final chrome = context.chrome;
 
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
         height: 62,
         decoration: BoxDecoration(
-          color: _navBackground,
+          color: chrome.bottomNavBackground,
           borderRadius: BorderRadius.circular(31),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+              color: chrome.headerShadow.withValues(alpha: 0.35),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -77,6 +74,7 @@ class _MainShellState extends State<MainShell> {
           children: [
             Expanded(
               child: _navItem(
+                context,
                 Icons.calendar_month_rounded,
                 Icons.calendar_month_outlined,
                 'Calendar',
@@ -87,6 +85,7 @@ class _MainShellState extends State<MainShell> {
             ),
             Expanded(
               child: _navItem(
+                context,
                 Icons.task_alt_rounded,
                 Icons.task_alt_outlined,
                 'Tasks',
@@ -97,6 +96,7 @@ class _MainShellState extends State<MainShell> {
             ),
             Expanded(
               child: _navItem(
+                context,
                 Icons.timer_rounded,
                 Icons.timer_outlined,
                 'Focus',
@@ -107,6 +107,7 @@ class _MainShellState extends State<MainShell> {
             ),
             Expanded(
               child: _navItem(
+                context,
                 Icons.bar_chart_rounded,
                 Icons.bar_chart_outlined,
                 'Analytics',
@@ -122,6 +123,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _navItem(
+    BuildContext context,
     IconData iconSelected,
     IconData iconUnselected,
     String label,
@@ -131,6 +133,10 @@ class _MainShellState extends State<MainShell> {
   }) {
     final selected = _selectedIndex == index;
     final narrow = MediaQuery.sizeOf(context).width < 360;
+    final chrome = context.chrome;
+    final indicatorColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
 
     return Semantics(
       button: true,
@@ -155,7 +161,9 @@ class _MainShellState extends State<MainShell> {
               children: [
                 Icon(
                   selected ? iconSelected : iconUnselected,
-                  color: selected ? _activeBlue : _inactiveIcon,
+                  color: selected
+                      ? chrome.bottomNavActive
+                      : chrome.bottomNavInactiveIcon,
                   size: 24,
                 ),
                 if (selected) ...[
@@ -165,7 +173,7 @@ class _MainShellState extends State<MainShell> {
                     height: 3,
                     width: 22,
                     decoration: BoxDecoration(
-                      color: Colors.black,
+                      color: indicatorColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -178,8 +186,9 @@ class _MainShellState extends State<MainShell> {
                       fontSize: narrow ? 9 : 10,
                       fontWeight:
                           selected ? FontWeight.w700 : FontWeight.w400,
-                      color:
-                          selected ? _activeBlue : _inactiveLabel,
+                      color: selected
+                          ? chrome.bottomNavActive
+                          : chrome.bottomNavInactiveLabel,
                       letterSpacing: -0.1,
                     ),
                     maxLines: 1,

@@ -2,15 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../theme/app_colors.dart';
+import '../theme/growductive_chrome.dart';
 import '../viewmodels/analytics_viewmodel.dart';
 import '../navigation/sidebar_drawer_controller.dart';
-
-/// Task / focus timer bar palette (category row + segment pills).
-const _axOuter = Color(0xFFD6E6FF);
-const _axFill = Color(0xFFEAF3FF);
-const _axBorder = Color(0xFFB6D3FF);
-const _axBlue = Color(0xFF103A8A);
 
 /// Standard analytics typography: section titles larger than body values.
 const double _kTitleCard = 18;
@@ -32,7 +26,7 @@ class AnalyticsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.base,
+      backgroundColor: context.chrome.scaffoldBackground,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -60,9 +54,9 @@ class AnalyticsView extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
-    // Must match `MainShell` bottom-nav colors for consistent look.
-    const navBg = Color(0xFFEAF3FF); // light blue header background
-    const navBlue = Color(0xFF103A8A); // darker blue for title
+    final chrome = context.chrome;
+    final navBg = chrome.headerBar;
+    final navBlue = chrome.navBlue;
     const menuCircleBg = Color(0xFF0F2E5C); // dark circle for menu button
     const double subtitleFontSize = 12.0;
     const double subtitleLineHeight = 1.2;
@@ -78,7 +72,7 @@ class AnalyticsView extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+                color: chrome.headerShadow.withValues(alpha: 0.35),
                 blurRadius: 18,
                 offset: const Offset(0, 6),
               ),
@@ -158,7 +152,7 @@ class AnalyticsView extends StatelessWidget {
             return Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: _axOuter,
+                color: context.chrome.segmentOuter,
                 borderRadius: BorderRadius.circular(25),
               ),
               child: Row(
@@ -170,7 +164,7 @@ class AnalyticsView extends StatelessWidget {
                       child: Icon(
                         CupertinoIcons.chevron_left,
                         size: compact ? 16 : 18,
-                        color: _axBlue,
+                        color: context.chrome.navBlue,
                       ),
                     ),
                   ),
@@ -185,7 +179,7 @@ class AnalyticsView extends StatelessWidget {
                           Icon(
                             CupertinoIcons.calendar,
                             size: compact ? 16 : 18,
-                            color: _axBlue,
+                            color: context.chrome.navBlue,
                           ),
                           SizedBox(width: compact ? 6 : 8),
                           Flexible(
@@ -194,7 +188,7 @@ class AnalyticsView extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: compact ? _kBody : _kWeekDate,
                                 fontWeight: FontWeight.w600,
-                                color: _axBlue,
+                                color: context.chrome.navBlue,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -207,7 +201,7 @@ class AnalyticsView extends StatelessWidget {
                                 width: 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                  color: _axBorder.withValues(alpha: 0.9),
+                                  color: context.chrome.segmentBorder.withValues(alpha: 0.9),
                                   shape: BoxShape.circle,
                                 ),
                               )
@@ -216,16 +210,16 @@ class AnalyticsView extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: _axFill,
+                                  color: context.chrome.segmentSelectedFill,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: _axBorder, width: 1),
+                                  border: Border.all(color: context.chrome.segmentBorder, width: 1),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'This week',
                                   style: TextStyle(
                                     fontSize: _kCaption,
                                     fontWeight: FontWeight.w600,
-                                    color: _axBlue,
+                                    color: context.chrome.navBlue,
                                   ),
                                 ),
                               ),
@@ -243,8 +237,8 @@ class AnalyticsView extends StatelessWidget {
                         CupertinoIcons.chevron_right,
                         size: compact ? 16 : 18,
                         color: vm.canGoToNextWeek
-                            ? _axBlue
-                            : _axBlue.withValues(alpha: 0.35),
+                            ? context.chrome.navBlue
+                            : context.chrome.navBlue.withValues(alpha: 0.35),
                       ),
                     ),
                   ),
@@ -290,12 +284,12 @@ class AnalyticsView extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
+                      Text(
                         'Select Week',
                         style: TextStyle(
                           fontSize: _kDialogTitle,
                           fontWeight: FontWeight.bold,
-                          color: _axBlue,
+                          color: context.chrome.navBlue,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -303,11 +297,11 @@ class AnalyticsView extends StatelessWidget {
                         data: Theme.of(ctx).copyWith(
                           datePickerTheme: DatePickerThemeData(
                             dayForegroundColor:
-                                const WidgetStatePropertyAll(_axBlue),
+                                WidgetStatePropertyAll(context.chrome.navBlue),
                             dayBackgroundColor: WidgetStateProperty.resolveWith(
                                 (Set<WidgetState> states) {
                               if (states.contains(WidgetState.selected)) {
-                                return _axFill;
+                                return context.chrome.segmentSelectedFill;
                               }
                               return null;
                             }),
@@ -318,8 +312,8 @@ class AnalyticsView extends StatelessWidget {
                                 return RoundedRectangleBorder(
                                   borderRadius:
                                       const BorderRadius.all(Radius.circular(8)),
-                                  side: const BorderSide(
-                                      color: _axBorder, width: 2),
+                                  side: BorderSide(
+                                      color: context.chrome.segmentBorder, width: 2),
                                 );
                               }
                               return const RoundedRectangleBorder(
@@ -328,11 +322,11 @@ class AnalyticsView extends StatelessWidget {
                               );
                             }),
                             todayForegroundColor:
-                                const WidgetStatePropertyAll(_axBlue),
+                                WidgetStatePropertyAll(context.chrome.navBlue),
                             todayBackgroundColor:
-                                const WidgetStatePropertyAll(_axFill),
-                            todayBorder: const BorderSide(
-                                color: _axBlue, width: 1.5),
+                                WidgetStatePropertyAll(context.chrome.segmentSelectedFill),
+                            todayBorder: BorderSide(
+                                color: context.chrome.navBlue, width: 1.5),
                           ),
                         ),
                         child: SizedBox(
@@ -357,8 +351,8 @@ class AnalyticsView extends StatelessWidget {
                             child: OutlinedButton(
                               onPressed: () => Navigator.of(ctx).pop(),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: _axBlue,
-                                side: const BorderSide(color: _axBorder, width: 1.5),
+                                foregroundColor: context.chrome.navBlue,
+                                side: BorderSide(color: context.chrome.segmentBorder, width: 1.5),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
@@ -378,7 +372,7 @@ class AnalyticsView extends StatelessWidget {
                                 vm.goToCurrentWeek();
                               },
                               style: FilledButton.styleFrom(
-                                backgroundColor: _axBlue,
+                                backgroundColor: context.chrome.navBlue,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
@@ -423,8 +417,8 @@ class AnalyticsView extends StatelessWidget {
                     title: 'Completion rate',
                     value: '$pct%',
                     icon: Icons.check_circle_rounded,
-                    iconBgColor: _axFill,
-                    iconColor: _axBlue,
+                    iconBgColor: context.chrome.segmentSelectedFill,
+                    iconColor: context.chrome.navBlue,
                   );
                 },
               ),
@@ -440,8 +434,8 @@ class AnalyticsView extends StatelessWidget {
                     title: 'Focus time',
                     value: '${analytics.totalFocusMinutes} min',
                     icon: Icons.timer_outlined,
-                    iconBgColor: _axFill,
-                    iconColor: _axBlue,
+                    iconBgColor: context.chrome.segmentSelectedFill,
+                    iconColor: context.chrome.navBlue,
                   );
                 },
               ),
@@ -481,7 +475,7 @@ class AnalyticsView extends StatelessWidget {
             decoration: BoxDecoration(
               color: iconBgColor,
               shape: BoxShape.circle,
-              border: Border.all(color: _axBorder, width: 1),
+              border: Border.all(color: context.chrome.segmentBorder, width: 1),
             ),
             child: Icon(icon, color: iconColor, size: 20),
           ),
@@ -493,11 +487,11 @@ class AnalyticsView extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: _kStatLineTitle,
                     fontWeight: FontWeight.w600,
                     height: 1.2,
-                    color: _axBlue,
+                    color: context.chrome.navBlue,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -509,7 +503,7 @@ class AnalyticsView extends StatelessWidget {
                     fontSize: _kStatLineValue,
                     fontWeight: FontWeight.w600,
                     height: 1.2,
-                    color: _axBlue.withValues(alpha: 0.88),
+                    color: context.chrome.navBlue.withValues(alpha: 0.88),
                   ),
                   maxLines: 2,
                 ),
@@ -530,21 +524,21 @@ class AnalyticsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: _axOuter,
+              color: context.chrome.segmentOuter,
               borderRadius: BorderRadius.circular(25),
             ),
             child: TabBar(
               padding: EdgeInsets.zero,
               indicatorPadding: EdgeInsets.zero,
               indicator: BoxDecoration(
-                color: _axFill,
+                color: context.chrome.segmentSelectedFill,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _axBorder, width: 2),
+                border: Border.all(color: context.chrome.segmentBorder, width: 2),
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
-              labelColor: _axBlue,
-              unselectedLabelColor: _axBlue,
+              labelColor: context.chrome.navBlue,
+              unselectedLabelColor: context.chrome.navBlue,
               labelStyle: const TextStyle(
                 fontSize: _kTab,
                 fontWeight: FontWeight.w600,
@@ -602,7 +596,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
           style: TextStyle(
             fontSize: _kBody,
             fontWeight: FontWeight.w500,
-            color: _axBlue.withValues(alpha: 0.75),
+            color: context.chrome.navBlue.withValues(alpha: 0.75),
           ),
           textAlign: TextAlign.center,
         ),
@@ -641,10 +635,10 @@ class _ProductivityTabState extends State<_ProductivityTab> {
             children: [
               Text(
                 'Completed $completed/$total',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: _kBody,
                   fontWeight: FontWeight.w600,
-                  color: _axBlue,
+                  color: context.chrome.navBlue,
                 ),
               ),
               const SizedBox(height: 12),
@@ -653,8 +647,8 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                 child: LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
                   minHeight: 8,
-                  backgroundColor: _axOuter,
-                  valueColor: const AlwaysStoppedAnimation<Color>(_axBlue),
+                  backgroundColor: context.chrome.segmentOuter,
+                  valueColor: AlwaysStoppedAnimation<Color>(context.chrome.navBlue),
                 ),
               ),
               const SizedBox(height: 10),
@@ -662,7 +656,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                 "You've completed $completed out of $total total tasks",
                 style: TextStyle(
                   fontSize: _kCaption,
-                  color: _axBlue.withValues(alpha: 0.55),
+                  color: context.chrome.navBlue.withValues(alpha: 0.55),
                 ),
               ),
             ],
@@ -703,7 +697,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                             Container(
                               height: h.clamp(4.0, maxHeight),
                               decoration: BoxDecoration(
-                                color: _axBlue.withValues(alpha: 0.55),
+                                color: context.chrome.navBlue.withValues(alpha: 0.55),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -712,7 +706,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                               i < labels.length ? labels[i] : '',
                               style: TextStyle(
                                 fontSize: _kCaption,
-                                color: _axBlue.withValues(alpha: 0.55),
+                                color: context.chrome.navBlue.withValues(alpha: 0.55),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -747,7 +741,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                     'No tasks by category yet',
                     style: TextStyle(
                       fontSize: _kBody,
-                      color: _axBlue.withValues(alpha: 0.55),
+                      color: context.chrome.navBlue.withValues(alpha: 0.55),
                     ),
                   ),
                 )
@@ -761,10 +755,10 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                                   width: 90,
                                   child: Text(
                                     c.categoryName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: _kBody,
                                       fontWeight: FontWeight.w600,
-                                      color: _axBlue,
+                                      color: context.chrome.navBlue,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -772,9 +766,9 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                                 const SizedBox(width: 8),
                                 Text(
                                   '${c.count}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: _kBody,
-                                    color: _axBlue,
+                                    color: context.chrome.navBlue,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -785,8 +779,8 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                                     child: LinearProgressIndicator(
                                       value: maxCount > 0 ? (c.count / maxCount).clamp(0.0, 1.0) : 0,
                                       minHeight: 8,
-                                      backgroundColor: _axOuter,
-                                      valueColor: const AlwaysStoppedAnimation<Color>(_axBlue),
+                                      backgroundColor: context.chrome.segmentOuter,
+                                      valueColor: AlwaysStoppedAnimation<Color>(context.chrome.navBlue),
                                     ),
                                   ),
                                 ),
@@ -813,10 +807,10 @@ class _ProductivityTabState extends State<_ProductivityTab> {
             children: [
               Text(
                 '${a.productivityScore}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: _kScoreHero,
                   fontWeight: FontWeight.bold,
-                  color: _axBlue,
+                  color: context.chrome.navBlue,
                 ),
               ),
               const SizedBox(width: 8),
@@ -825,7 +819,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                 style: TextStyle(
                   fontSize: _kScoreDenom,
                   fontWeight: FontWeight.w500,
-                  color: _axBlue.withValues(alpha: 0.45),
+                  color: context.chrome.navBlue.withValues(alpha: 0.45),
                 ),
               ),
             ],
@@ -855,10 +849,10 @@ class _ProductivityTabState extends State<_ProductivityTab> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: _kTitleCard,
               fontWeight: FontWeight.w600,
-              color: _axBlue,
+              color: context.chrome.navBlue,
             ),
           ),
           const SizedBox(height: 16),
@@ -896,7 +890,7 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
           style: TextStyle(
             fontSize: _kBody,
             fontWeight: FontWeight.w500,
-            color: _axBlue.withValues(alpha: 0.75),
+            color: context.chrome.navBlue.withValues(alpha: 0.75),
           ),
           textAlign: TextAlign.center,
         ),
@@ -931,12 +925,12 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
           title: title,
           child: Text(
             value(a),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: _kFocusMetricValue,
               fontWeight: FontWeight.bold,
               height: 1.25,
               letterSpacing: -0.3,
-              color: _axBlue,
+              color: context.chrome.navBlue,
             ),
           ),
         );
@@ -957,10 +951,10 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
             children: [
               Text(
                 '${a.focusScore}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: _kScoreHero,
                   fontWeight: FontWeight.bold,
-                  color: _axBlue,
+                  color: context.chrome.navBlue,
                 ),
               ),
               const SizedBox(width: 8),
@@ -969,7 +963,7 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
                 style: TextStyle(
                   fontSize: _kScoreDenom,
                   fontWeight: FontWeight.w500,
-                  color: _axBlue.withValues(alpha: 0.45),
+                  color: context.chrome.navBlue.withValues(alpha: 0.45),
                 ),
               ),
             ],
@@ -999,10 +993,10 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: _kTitleCard,
               fontWeight: FontWeight.w600,
-              color: _axBlue,
+              color: context.chrome.navBlue,
             ),
           ),
           const SizedBox(height: 16),

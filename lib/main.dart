@@ -12,6 +12,7 @@ import 'viewmodels/user_preferences_viewmodel.dart';
 import 'views/auth/auth_wrapper.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
+import 'models/user_preferences_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,44 +48,72 @@ void main() async {
         ChangeNotifierProvider.value(value: analyticsViewModel),
         ChangeNotifierProvider.value(value: userPreferencesViewModel),
       ],
-      child: MaterialApp(
-        theme: AppTheme.lightTheme(),
-        home: const AuthWrapper(), // Start with AuthWrapper instead of MainShell
-        debugShowCheckedModeBanner: false,
-        builder: (context, child) {
-          final mq = MediaQuery.of(context);
-          final platform = defaultTargetPlatform;
-          final isPhoneLike = !kIsWeb &&
-              (platform == TargetPlatform.android ||
-                  platform == TargetPlatform.iOS);
-
-          // Keep system accessibility scaling, but clamp extremes and make
-          // phone UI slightly more compact to match web sizing.
-          final sysScale = mq.textScaleFactor;
-          final clampedSysScale = sysScale.clamp(0.90, 1.10);
-          final effectiveScale =
-              isPhoneLike ? (clampedSysScale * 0.92) : clampedSysScale;
-
-          final base = Theme.of(context);
-          final themedChild = Theme(
-            data: base.copyWith(
-              visualDensity:
-                  isPhoneLike ? VisualDensity.compact : VisualDensity.standard,
-              materialTapTargetSize: isPhoneLike
-                  ? MaterialTapTargetSize.shrinkWrap
-                  : MaterialTapTargetSize.padded,
-            ),
-            child: child ?? const SizedBox.shrink(),
-          );
-
-          return MediaQuery(
-            data: mq.copyWith(
-              textScaler: TextScaler.linear(effectiveScale.toDouble()),
-            ),
-            child: themedChild,
-          );
-        },
-      ),
+      child: const GrowductiveApp(),
     ),
   );
+}
+
+/// Root [MaterialApp] with light/dark/system theme from [UserPreferencesViewModel].
+class GrowductiveApp extends StatelessWidget {
+  const GrowductiveApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final prefsVM = context.watch<UserPreferencesViewModel>();
+
+    return StreamBuilder<UserPreferencesModel?>(
+      stream: prefsVM.preferencesStream,
+      builder: (context, snapshot) {
+        final themeStr = snapshot.data?.theme ?? 'system';
+        final ThemeMode mode;
+        if (themeStr == 'dark') {
+          mode = ThemeMode.dark;
+        } else if (themeStr == 'light') {
+          mode = ThemeMode.light;
+        } else {
+          mode = ThemeMode.system;
+        }
+
+        return MaterialApp(
+          theme: AppTheme.lightTheme(),
+          darkTheme: AppTheme.darkTheme(),
+          themeMode: mode,
+          home: const AuthWrapper(),
+          debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            final platform = defaultTargetPlatform;
+            final isPhoneLike = !kIsWeb &&
+                (platform == TargetPlatform.android ||
+                    platform == TargetPlatform.iOS);
+
+            final sysScale = mq.textScaleFactor;
+            final clampedSysScale = sysScale.clamp(0.90, 1.10);
+            final effectiveScale =
+                isPhoneLike ? (clampedSysScale * 0.92) : clampedSysScale;
+
+            final base = Theme.of(context);
+            final themedChild = Theme(
+              data: base.copyWith(
+                visualDensity: isPhoneLike
+                    ? VisualDensity.compact
+                    : VisualDensity.standard,
+                materialTapTargetSize: isPhoneLike
+                    ? MaterialTapTargetSize.shrinkWrap
+                    : MaterialTapTargetSize.padded,
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: TextScaler.linear(effectiveScale.toDouble()),
+              ),
+              child: themedChild,
+            );
+          },
+        );
+      },
+    );
+  }
 }
