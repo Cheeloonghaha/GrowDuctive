@@ -15,6 +15,9 @@ class TaskModel {
   /// True if this task has at least one scheduled calendar entry.
   bool scheduled;
   DateTime createdAt;
+  /// The logical day this task belongs to in the UI (used for filtering/overdue).
+  /// This is **not** the same as [createdAt] (the real creation timestamp).
+  DateTime taskDate;
   DateTime updatedAt;
   DateTime? completedAt; // Date/time when task was completed (null if pending)
   /// True once the task has passed its creation date without being completed. Never set back to false (for analytics).
@@ -38,12 +41,20 @@ class TaskModel {
     this.autoSchedule = false,
     this.scheduled = false,
     DateTime? createdAt,
+    DateTime? taskDate,
     DateTime? updatedAt,
     this.completedAt,
     this.overdue = false,
     this.startTime,
     this.endTime,
   })  : createdAt = createdAt ?? DateTime.now(),
+        taskDate = taskDate != null
+            ? DateTime(taskDate.year, taskDate.month, taskDate.day)
+            : DateTime(
+                (createdAt ?? DateTime.now()).year,
+                (createdAt ?? DateTime.now()).month,
+                (createdAt ?? DateTime.now()).day,
+              ),
         updatedAt = updatedAt ?? DateTime.now();
 
   bool get isCompleted => status == "completed";
@@ -64,6 +75,7 @@ class TaskModel {
     bool? reminderOffset,
     bool? autoSchedule,
     DateTime? createdAt,
+    DateTime? taskDate,
     DateTime? updatedAt,
     DateTime? completedAt,
     bool? overdue,
@@ -84,6 +96,7 @@ class TaskModel {
       reminderOffset: reminderOffset ?? this.reminderOffset,
       autoSchedule: autoSchedule ?? this.autoSchedule,
       createdAt: createdAt ?? this.createdAt,
+      taskDate: taskDate ?? this.taskDate,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
       overdue: overdue ?? this.overdue,
@@ -102,6 +115,12 @@ class TaskModel {
 
   // Convert Firestore Document to TaskModel (FETCHING)
   factory TaskModel.fromMap(Map<String, dynamic> data, String documentId) {
+    final created = data['created_at'] != null
+        ? (data['created_at'] as Timestamp).toDate()
+        : DateTime.now();
+    final taskDate = data['task_date'] != null
+        ? (data['task_date'] as Timestamp).toDate()
+        : created;
     return TaskModel(
       id: documentId,
       userId: data['user_id'] ?? "DUMMY_USER",
@@ -115,9 +134,8 @@ class TaskModel {
       status: data['status'] ?? "pending",
       reminderOffset: data['reminder_offset'] ?? false,
       autoSchedule: data['auto_schedule'] ?? false,
-      createdAt: data['created_at'] != null
-          ? (data['created_at'] as Timestamp).toDate()
-          : DateTime.now(),
+      createdAt: created,
+      taskDate: taskDate,
       updatedAt: data['updated_at'] != null
           ? (data['updated_at'] as Timestamp).toDate()
           : DateTime.now(),
@@ -145,6 +163,7 @@ class TaskModel {
       'reminder_offset': reminderOffset,
       'auto_schedule': autoSchedule,
       'created_at': Timestamp.fromDate(createdAt),
+      'task_date': Timestamp.fromDate(taskDate),
       'updated_at': Timestamp.fromDate(updatedAt),
       'completed_at': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
       'overdue': overdue,

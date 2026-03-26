@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../theme/app_colors.dart';
 import '../viewmodels/auth_viewmodel.dart';
-import '../models/user_profile_model.dart';
 
 /// Temporary demo screen to set up all profile fields.
 class ProfileEditView extends StatefulWidget {
@@ -66,19 +66,12 @@ class _ProfileEditViewState extends State<ProfileEditView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Profile updated'),
-          backgroundColor: Colors.black,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+        const SnackBar(content: Text('Profile updated')),
       );
       Navigator.pop(context);
     }
@@ -94,39 +87,19 @@ class _ProfileEditViewState extends State<ProfileEditView> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasError) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF5F5F7),
+            backgroundColor: AppColors.base,
             appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: const Text(
-                'Edit Profile',
-                style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
-              ),
+              title: const Text('Edit Profile'),
             ),
-            body: const Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
+            ),
           );
         }
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F7),
+          backgroundColor: AppColors.base,
           appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: const Text(
-              'Edit Profile',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            title: const Text('Edit Profile'),
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(20),

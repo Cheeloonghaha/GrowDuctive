@@ -5,21 +5,28 @@ import 'package:provider/provider.dart';
 
 import '../models/focus_session_model.dart';
 import '../models/focus_timer_model.dart';
+import '../theme/app_colors.dart';
+import '../navigation/sidebar_drawer_controller.dart';
 import '../viewmodels/focus_timer_viewmodel.dart';
 
 class FocusTimerView extends StatelessWidget {
   const FocusTimerView({super.key});
 
+  // Match task_view category bar + Tasks/Overdue segment styling.
+  static const Color _barOuter = Color(0xFFD6E6FF);
+  static const Color _barSelectedFill = Color(0xFFEAF3FF);
+  static const Color _barSelectedBorder = Color(0xFFB6D3FF);
+  static const Color _barText = Color(0xFF103A8A);
+
   @override
   Widget build(BuildContext context) {
-    final themeBackground = const Color(0xFFF5F5F7);
-
     return Scaffold(
-      backgroundColor: themeBackground,
+      backgroundColor: AppColors.base,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(context),
+            const SizedBox(height: 10),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
@@ -56,55 +63,113 @@ class FocusTimerView extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 380;
-          return Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Focus Timer',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: narrow ? 26 : 34,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              if (narrow)
-                IconButton(
-                  onPressed: () => _showCustomTimersSheet(context),
-                  icon: const Icon(CupertinoIcons.slider_horizontal_3),
-                  tooltip: 'Custom timers',
-                  style: IconButton.styleFrom(foregroundColor: Colors.black),
-                )
-              else
-                TextButton.icon(
-                  onPressed: () => _showCustomTimersSheet(context),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.black,
-                  ),
-                  icon: const Icon(
-                    CupertinoIcons.slider_horizontal_3,
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'Custom Timers',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+    final theme = Theme.of(context);
+    // Must match `MainShell` bottom-nav colors for consistent look.
+    const navBg = Color(0xFFEAF3FF); // light blue header background
+    const navBlue = Color(0xFF103A8A); // darker blue for title/icon
+    const menuCircleBg = Color(0xFF0F2E5C); // dark circle for menu button
+    const double subtitleFontSize = 12.0;
+    const double subtitleLineHeight = 1.2;
+    final double subtitleBoxHeight = subtitleFontSize * subtitleLineHeight * 2;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: navBg,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Material(
+                    color: menuCircleBg,
+                    elevation: 2,
+                    shadowColor: menuCircleBg.withValues(alpha: 0.25),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () {
+                        SidebarDrawerController.scaffoldKey.currentState?.openDrawer();
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.menu, color: Colors.white, size: 20),
+                      ),
                     ),
                   ),
-                ),
-            ],
-          );
-        },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Focus Timer',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: navBlue,
+                            letterSpacing: -0.5,
+                            fontSize: 21,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        SizedBox(
+                          height: subtitleBoxHeight,
+                          child: Text(
+                            'Concentrate all your thoughts upon the work at hand. — Alenxander.',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: navBlue.withValues(alpha: 0.55),
+                              fontWeight: FontWeight.w500,
+                              height: subtitleLineHeight,
+                              fontSize: subtitleFontSize,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    color: navBg,
+                    elevation: 2,
+                    shadowColor: navBlue.withValues(alpha: 0.18),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => _showCustomTimersSheet(context),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          CupertinoIcons.slider_horizontal_3,
+                          color: navBlue,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -257,40 +322,50 @@ class FocusTimerView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Phase selector — wraps on narrow screens
+          // Phase selector — same bar design as task_view category / segment
           LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 360;
-              return Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                alignment: WrapAlignment.start,
-                children: [
-                  _phaseChip(
-                    label: 'Focus',
-                    selected: isFocus,
-                    compact: compact,
-                    onTap: () =>
-                        Provider.of<FocusTimerViewModel>(context, listen: false)
-                            .selectPhase(FocusTimerPhase.focus),
-                  ),
-                  _phaseChip(
-                    label: 'Short break',
-                    selected: isShort,
-                    compact: compact,
-                    onTap: () =>
-                        Provider.of<FocusTimerViewModel>(context, listen: false)
-                            .selectPhase(FocusTimerPhase.shortBreak),
-                  ),
-                  _phaseChip(
-                    label: 'Long break',
-                    selected: isLong,
-                    compact: compact,
-                    onTap: () =>
-                        Provider.of<FocusTimerViewModel>(context, listen: false)
-                            .selectPhase(FocusTimerPhase.longBreak),
-                  ),
-                ],
+              return Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: _barOuter,
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _phaseSegment(
+                        label: 'Focus',
+                        selected: isFocus,
+                        compact: compact,
+                        onTap: () =>
+                            Provider.of<FocusTimerViewModel>(context, listen: false)
+                                .selectPhase(FocusTimerPhase.focus),
+                      ),
+                    ),
+                    Expanded(
+                      child: _phaseSegment(
+                        label: 'Short break',
+                        selected: isShort,
+                        compact: compact,
+                        onTap: () =>
+                            Provider.of<FocusTimerViewModel>(context, listen: false)
+                                .selectPhase(FocusTimerPhase.shortBreak),
+                      ),
+                    ),
+                    Expanded(
+                      child: _phaseSegment(
+                        label: 'Long break',
+                        selected: isLong,
+                        compact: compact,
+                        onTap: () =>
+                            Provider.of<FocusTimerViewModel>(context, listen: false)
+                                .selectPhase(FocusTimerPhase.longBreak),
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -306,7 +381,7 @@ class FocusTimerView extends StatelessWidget {
                   style: TextStyle(
                     fontSize: constraints.maxWidth < 320 ? 40 : 52,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: _barText,
                   ),
                 ),
               );
@@ -323,65 +398,49 @@ class FocusTimerView extends StatelessWidget {
                   ? ((vm.currentPhaseDuration - vm.remainingSeconds) / vm.currentPhaseDuration).clamp(0.0, 1.0)
                   : 0,
               backgroundColor: Colors.grey[300],
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(Colors.black87),
+              valueColor: const AlwaysStoppedAnimation<Color>(_barText),
             ),
           ),
           const SizedBox(height: 24),
 
-          // Start / Reset — share width, scale down if needed
+          // Start / Reset — same segment-bar style as task_view Tasks/Overdue
           LayoutBuilder(
             builder: (context, constraints) {
-              final gap = constraints.maxWidth < 340 ? 10.0 : 16.0;
-              return Row(
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
-                        child: _primaryCircleButton(
-                          icon: vm.isRunning
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          label: vm.isRunning ? 'Pause' : 'Start',
-                          horizontalPadding:
-                              constraints.maxWidth < 360 ? 16 : 24,
-                          onTap: () {
-                            final viewModel =
-                                Provider.of<FocusTimerViewModel>(
-                                        context,
-                                        listen: false);
-                            if (viewModel.isRunning) {
-                              viewModel.pause();
-                            } else {
-                              viewModel.start();
-                            }
-                          },
-                        ),
+              return Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: _barOuter,
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _actionSegment(
+                        icon: vm.isRunning
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        label: vm.isRunning ? 'Pause' : 'Start',
+                        onTap: () {
+                          final viewModel =
+                              Provider.of<FocusTimerViewModel>(context, listen: false);
+                          if (viewModel.isRunning) {
+                            viewModel.pause();
+                          } else {
+                            viewModel.start();
+                          }
+                        },
                       ),
                     ),
-                  ),
-                  SizedBox(width: gap),
-                  Expanded(
-                    child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
-                        child: _secondaryCircleButton(
-                          icon: Icons.refresh_rounded,
-                          label: 'Reset',
-                          horizontalPadding:
-                              constraints.maxWidth < 360 ? 16 : 24,
-                          onTap: () => Provider.of<FocusTimerViewModel>(
-                                  context,
-                                  listen: false)
-                              .reset(),
-                        ),
+                    Expanded(
+                      child: _actionSegment(
+                        icon: Icons.refresh_rounded,
+                        label: 'Reset',
+                        onTap: () => Provider.of<FocusTimerViewModel>(context, listen: false)
+                            .reset(),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           ),
@@ -398,12 +457,12 @@ class FocusTimerView extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Focus Sessions Today',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w500,
+                      color: _barText.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -412,7 +471,7 @@ class FocusTimerView extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: _barText,
                     ),
                   ),
                 ],
@@ -440,12 +499,12 @@ class FocusTimerView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    const Text(
+                    Text(
                       'Sessions today',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: _barText,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -453,8 +512,8 @@ class FocusTimerView extends StatelessWidget {
                       '($count)',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                        color: _barText,
                       ),
                     ),
                   ],
@@ -561,7 +620,8 @@ class FocusTimerView extends StatelessWidget {
     );
   }
 
-  Widget _phaseChip({
+  /// Single segment inside the phase bar (task_view category chip style).
+  Widget _phaseSegment({
     required String label,
     required bool selected,
     required VoidCallback onTap,
@@ -570,86 +630,66 @@ class FocusTimerView extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
         padding: EdgeInsets.symmetric(
-          horizontal: compact ? 10 : 14,
-          vertical: 8,
+          horizontal: compact ? 4 : 6,
+          vertical: 10,
         ),
         decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.grey[200],
-          borderRadius: BorderRadius.circular(999),
+          color: selected ? _barSelectedFill : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: selected
+              ? Border.all(color: _barSelectedBorder, width: 2)
+              : null,
         ),
+        alignment: Alignment.center,
         child: Text(
           label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: compact ? 12 : 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.grey[800],
+            fontSize: compact ? 11 : 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: _barText,
+            height: 1.05,
           ),
         ),
       ),
     );
   }
 
-  Widget _primaryCircleButton({
+  /// Start/Pause and Reset — identical pill style (task_view selected segment).
+  Widget _actionSegment({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    double horizontalPadding = 24,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(999),
+          color: _barSelectedFill,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _barSelectedBorder, width: 2),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(width: 8),
+            Icon(icon, color: _barText, size: 20),
+            const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
-                color: Colors.white,
+                color: _barText,
                 fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _secondaryCircleButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    double horizontalPadding = 24,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.black87, size: 22),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
+                fontSize: 14,
+                height: 1.0,
               ),
             ),
           ],
@@ -683,7 +723,7 @@ class _CustomTimersSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFF5F5F7),
+        color: AppColors.base,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(

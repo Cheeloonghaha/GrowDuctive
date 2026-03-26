@@ -20,6 +20,9 @@ abstract final class AppColors {
   static const Color softGold = Color(0xFFF5A623);
   static const Color coral = Color(0xFFFF6B6B);
 
+  /// Floating bottom nav pill background
+  static const Color navBarFloating = Color(0xFFF0F0F3);
+
   /// Glass overlay tints
   static Color glassFill = Colors.white.withValues(alpha: 0.78);
   static Color glassBorder = Colors.white.withValues(alpha: 0.55);

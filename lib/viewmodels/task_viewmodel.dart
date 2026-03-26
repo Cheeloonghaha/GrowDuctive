@@ -24,8 +24,8 @@ class TaskViewModel extends ChangeNotifier {
   static bool _shouldBeOverdue(TaskModel task) {
     if (task.isCompleted) return false;
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    final creationDay = DateTime(task.createdAt.year, task.createdAt.month, task.createdAt.day);
-    return today.isAfter(creationDay);
+    final taskDay = DateTime(task.taskDate.year, task.taskDate.month, task.taskDate.day);
+    return today.isAfter(taskDay);
   }
 
   /// Public helper for determining if a task should be considered overdue "today".
@@ -122,12 +122,12 @@ class TaskViewModel extends ChangeNotifier {
           effective = task.copyWith(overdue: true);
         }
 
-        final createdDay = DateTime(
-          effective.createdAt.year,
-          effective.createdAt.month,
-          effective.createdAt.day,
+        final taskDay = DateTime(
+          effective.taskDate.year,
+          effective.taskDate.month,
+          effective.taskDate.day,
         );
-        final isForSelectedDay = createdDay == targetDay;
+        final isForSelectedDay = taskDay == targetDay;
         final include =
             isForSelectedDay || (includeOverdue && (effective.overdue == true));
         if (!include) continue;
@@ -222,7 +222,8 @@ class TaskViewModel extends ChangeNotifier {
   }
 
   // ADD TASK with all new attributes (uses current userId).
-  // [createdAt] when set (e.g. from calendar) creates the task for that date so it appears in to-do for that day.
+  // [taskDate] sets the logical day the task belongs to in the UI (Calendar/Tasks filtering).
+  // [createdAt] is the real creation timestamp (defaults to now).
   Future<String?> addTask({
     required String title,
     required String description,
@@ -230,12 +231,14 @@ class TaskViewModel extends ChangeNotifier {
     required int importance,
     required int duration,
     required String categoryId,
+    DateTime? taskDate,
     DateTime? createdAt,
     int? startTime,
     int? endTime,
   }) async {
     try {
       final created = createdAt ?? DateTime.now();
+      final day = taskDate ?? created;
       final task = TaskModel(
         id: '', // Will be set by Firestore
         userId: userId,
@@ -249,6 +252,7 @@ class TaskViewModel extends ChangeNotifier {
         reminderOffset: false,
         autoSchedule: false,
         createdAt: created,
+        taskDate: day,
         updatedAt: created,
         startTime: startTime,
         endTime: endTime,

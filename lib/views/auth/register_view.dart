@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../navigation/app_page_routes.dart';
+import '../../theme/app_spacing.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'login_view.dart';
 
@@ -53,27 +55,17 @@ class _RegisterViewState extends State<RegisterView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } else if (mounted) {
-      // Registration successful - navigate back to login
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const LoginView()),
+        fadeSlideRoute(const LoginView()),
       );
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Account created successfully! Please sign in."),
-          backgroundColor: Colors.black,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+        const SnackBar(
+          content: Text("Account created successfully! Please sign in."),
         ),
       );
     }
@@ -97,11 +89,7 @@ class _RegisterViewState extends State<RegisterView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } else if (authVM.isLoggedIn && mounted) {
@@ -114,14 +102,9 @@ class _RegisterViewState extends State<RegisterView> {
       }
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Signed in with Google!"),
-          backgroundColor: Colors.black,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+        const SnackBar(
+          content: Text("Signed in with Google!"),
+          duration: Duration(seconds: 1),
         ),
       );
     }
@@ -130,68 +113,59 @@ class _RegisterViewState extends State<RegisterView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: scheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(AppSpacing.lg),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.person_add_outlined,
                     size: 80,
-                    color: Colors.black,
+                    color: scheme.onSurface,
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: AppSpacing.md),
+                  Text(
                     'Create Account',
-                    style: TextStyle(
-                      fontSize: 32,
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: scheme.onSurface,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppSpacing.xs),
                   Text(
                     'Sign up to get started',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: scheme.onSurface.withValues(alpha: 0.62),
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
+                  SizedBox(height: AppSpacing.xxl + 8),
 
                   // Username Field
                   TextFormField(
                     controller: _usernameController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Username',
                       hintText: 'Choose a username',
-                      prefixIcon: const Icon(Icons.alternate_email),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
+                      prefixIcon: Icon(Icons.alternate_email),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -206,25 +180,16 @@ class _RegisterViewState extends State<RegisterView> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Email Field
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Email',
                       hintText: 'Enter your email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
+                      prefixIcon: Icon(Icons.email_outlined),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -236,7 +201,7 @@ class _RegisterViewState extends State<RegisterView> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Password Field
                   TextFormField(
@@ -256,15 +221,6 @@ class _RegisterViewState extends State<RegisterView> {
                           });
                         },
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -276,7 +232,7 @@ class _RegisterViewState extends State<RegisterView> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Confirm Password Field
                   TextFormField(
@@ -296,15 +252,6 @@ class _RegisterViewState extends State<RegisterView> {
                           });
                         },
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -316,27 +263,21 @@ class _RegisterViewState extends State<RegisterView> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppSpacing.xl),
 
                   // Register Button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              color: scheme.onPrimary,
                             ),
                           )
                         : const Text(
@@ -347,37 +288,32 @@ class _RegisterViewState extends State<RegisterView> {
                             ),
                           ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey[400])),
+                      Expanded(child: Divider(color: scheme.outline.withValues(alpha: 0.45))),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                         child: Text(
                           'OR',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: scheme.onSurface.withValues(alpha: 0.55),
                             fontSize: 14,
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Colors.grey[400])),
+                      Expanded(child: Divider(color: scheme.outline.withValues(alpha: 0.45))),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Google Sign-In Button
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _handleGoogleSignIn,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      side: const BorderSide(color: Colors.black, width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     ),
                     icon: Image.network(
                       'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
@@ -395,7 +331,7 @@ class _RegisterViewState extends State<RegisterView> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Login Link
                   Row(
@@ -403,19 +339,19 @@ class _RegisterViewState extends State<RegisterView> {
                     children: [
                       Text(
                         "Already have an account? ",
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
                       ),
                       TextButton(
                         onPressed: () {
                           Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (context) => const LoginView()),
+                            fadeSlideRoute(const LoginView()),
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           'Sign In',
                           style: TextStyle(
-                            color: Colors.black,
+                            color: scheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

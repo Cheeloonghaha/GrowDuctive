@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../navigation/app_page_routes.dart';
+import '../../theme/app_spacing.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'register_view.dart';
-import 'auth_wrapper.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -50,15 +51,10 @@ class _LoginViewState extends State<LoginView> {
     });
 
     if (error != null) {
-      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } else {
@@ -78,14 +74,9 @@ class _LoginViewState extends State<LoginView> {
       
       // Show success message briefly
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Sign in successful!"),
-          backgroundColor: Colors.black,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+        const SnackBar(
+          content: Text("Sign in successful!"),
+          duration: Duration(seconds: 1),
         ),
       );
     }
@@ -108,15 +99,10 @@ class _LoginViewState extends State<LoginView> {
     });
 
     if (error != null) {
-      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } else if (authVM.isLoggedIn) {
@@ -130,14 +116,9 @@ class _LoginViewState extends State<LoginView> {
       
       // Show success message briefly
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Signed in with Google!"),
-          backgroundColor: Colors.black,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+        const SnackBar(
+          content: Text("Signed in with Google!"),
+          duration: Duration(seconds: 1),
         ),
       );
     }
@@ -156,7 +137,6 @@ class _LoginViewState extends State<LoginView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               title: const Text('Reset password'),
               content: Form(
                 key: formKey,
@@ -168,26 +148,17 @@ class _LoginViewState extends State<LoginView> {
                       "Enter your email and we'll send you a link to reset your password.",
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[700],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: AppSpacing.lg),
                     TextFormField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Email',
                         hintText: 'Enter your email',
-                        prefixIcon: const Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.black, width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
+                        prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -205,7 +176,12 @@ class _LoginViewState extends State<LoginView> {
               actions: [
                 TextButton(
                   onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-                  child: Text('Cancel', style: TextStyle(color: Colors.grey[700])),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                    ),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: isLoading
@@ -222,11 +198,7 @@ class _LoginViewState extends State<LoginView> {
                               ScaffoldMessenger.of(loginContext).showSnackBar(
                                 SnackBar(
                                   content: Text(error),
-                                  backgroundColor: Colors.red,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  backgroundColor: Theme.of(loginContext).colorScheme.error,
                                 ),
                               );
                             }
@@ -234,34 +206,22 @@ class _LoginViewState extends State<LoginView> {
                             Navigator.pop(dialogContext);
                             if (loginContext.mounted) {
                               ScaffoldMessenger.of(loginContext).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
+                                const SnackBar(
+                                  content: Text(
                                     'Check your email for the password reset link.',
-                                  ),
-                                  backgroundColor: Colors.black,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                               );
                             }
                           }
                         },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
                   child: isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         )
                       : const Text('Send link'),
@@ -276,62 +236,52 @@ class _LoginViewState extends State<LoginView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(AppSpacing.lg),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/App Name
-                  const Icon(
+                  Icon(
                     Icons.task_alt,
                     size: 80,
-                    color: Colors.black,
+                    color: scheme.onSurface,
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: AppSpacing.md),
+                  Text(
                     'GrowDuctive',
-                    style: TextStyle(
-                      fontSize: 32,
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: scheme.onSurface,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppSpacing.xs),
                   Text(
                     'Sign in to continue',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: scheme.onSurface.withValues(alpha: 0.62),
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
+                  SizedBox(height: AppSpacing.xxl + 8),
 
                   // Email Field
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Email',
                       hintText: 'Enter your email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
+                      prefixIcon: Icon(Icons.email_outlined),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -343,7 +293,7 @@ class _LoginViewState extends State<LoginView> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Password Field
                   TextFormField(
@@ -363,15 +313,6 @@ class _LoginViewState extends State<LoginView> {
                           });
                         },
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -383,7 +324,7 @@ class _LoginViewState extends State<LoginView> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppSpacing.xs),
 
                   // Forgot password link
                   Align(
@@ -393,33 +334,27 @@ class _LoginViewState extends State<LoginView> {
                       child: Text(
                         'Forgot password?',
                         style: TextStyle(
-                          color: Colors.grey[700],
+                          color: scheme.onSurface.withValues(alpha: 0.65),
                           fontSize: 14,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Login Button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              color: scheme.onPrimary,
                             ),
                           )
                         : const Text(
@@ -430,37 +365,32 @@ class _LoginViewState extends State<LoginView> {
                             ),
                           ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey[400])),
+                      Expanded(child: Divider(color: scheme.outline.withValues(alpha: 0.45))),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                         child: Text(
                           'OR',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: scheme.onSurface.withValues(alpha: 0.55),
                             fontSize: 14,
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Colors.grey[400])),
+                      Expanded(child: Divider(color: scheme.outline.withValues(alpha: 0.45))),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Google Sign-In Button
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _handleGoogleSignIn,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      side: const BorderSide(color: Colors.black, width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     ),
                     icon: Image.network(
                       'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
@@ -478,7 +408,7 @@ class _LoginViewState extends State<LoginView> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppSpacing.md),
 
                   // Register Link
                   Row(
@@ -486,19 +416,19 @@ class _LoginViewState extends State<LoginView> {
                     children: [
                       Text(
                         "Don't have an account? ",
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
                       ),
                       TextButton(
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const RegisterView()),
+                            fadeSlideRoute(const RegisterView()),
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           'Sign Up',
                           style: TextStyle(
-                            color: Colors.black,
+                            color: scheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

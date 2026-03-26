@@ -1,207 +1,283 @@
-  import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/user_profile_model.dart';
+import '../navigation/app_page_routes.dart';
+import '../theme/app_colors.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/user_preferences_viewmodel.dart';
-import '../models/user_profile_model.dart';
 import 'profile_edit_view.dart';
 
+/// Deep navy header + gold accents (reference mockup).
+const Color _profileNavyTop = Color(0xFF0F2347);
+const Color _profileNavyMid = Color(0xFF152B55);
+const Color _profileGold = Color(0xFFD4AF37);
+const Color _profileGoldInner = Color(0xFFE8C76A);
+
 class ProfileView extends StatelessWidget {
-  const ProfileView({super.key});
+  const ProfileView({super.key, this.onQuit});
+
+  /// When embedded in [MainShell], switches back to the first tab (e.g. Calendar).
+  final VoidCallback? onQuit;
 
   @override
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
-      body: SafeArea(
-        child: StreamBuilder<UserProfileModel?>(
-          stream: authVM.currentUserProfileStream,
-          builder: (context, snapshot) {
-            final profile = snapshot.data;
-            final username = profile?.username ?? authVM.currentUser?.displayName ?? 'User';
-            final email = profile?.email ?? authVM.currentUser?.email ?? '';
-            final bio = profile?.bio;
-            final profileImageUrl = profile?.profileImageUrl ?? authVM.currentUser?.photoURL;
+      backgroundColor: AppColors.base,
+      body: StreamBuilder<UserProfileModel?>(
+        stream: authVM.currentUserProfileStream,
+        builder: (context, snapshot) {
+          final profile = snapshot.data;
+          final username = profile?.username ?? authVM.currentUser?.displayName ?? 'User';
+          final email = profile?.email ?? authVM.currentUser?.email ?? '';
+          final bio = profile?.bio;
+          final profileImageUrl = profile?.profileImageUrl ?? authVM.currentUser?.photoURL;
+          final subtitle = (bio != null && bio.trim().isNotEmpty)
+              ? bio.trim()
+              : (email.isNotEmpty ? email : '@$username');
 
-            return Column(
-              children: [
-                // Header: avatar, name, username, email, bio
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Colors.grey[300],
-                        backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
-                            ? NetworkImage(profileImageUrl)
-                            : null,
-                        child: profileImageUrl == null || profileImageUrl.isEmpty
-                            ? Icon(Icons.person, size: 30, color: Colors.grey[600])
-                            : null,
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      height: 320,
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [_profileNavyTop, _profileNavyMid],
+                        ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CustomPaint(painter: _ProfileWavePainter()),
+                          Positioned(
+                            right: -40,
+                            top: 40,
+                            child: CircleAvatar(
+                              radius: 80,
+                              backgroundColor: Colors.white.withValues(alpha: 0.04),
+                            ),
+                          ),
+                          Positioned(
+                            left: -30,
+                            bottom: 60,
+                            child: CircleAvatar(
+                              radius: 55,
+                              backgroundColor: Colors.white.withValues(alpha: 0.03),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () {
+                                    if (onQuit != null) {
+                                      onQuit!();
+                                    } else {
+                                      Navigator.maybePop(context);
+                                    }
+                                  },
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  tooltip: 'Quit',
+                                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                                ),
+                                const Expanded(
+                                  child: Text(
+                                    'Your Profile',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 48),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _GoldRingAvatar(
+                              radius: 48,
+                              profileImageUrl: profileImageUrl,
+                            ),
+                            const SizedBox(height: 16),
                             Text(
                               username,
+                              textAlign: TextAlign.center,
                               style: const TextStyle(
-                                fontSize: 24,
+                                fontSize: 26,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '@$username',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            if (bio != null && bio.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                bio,
+                            const SizedBox(height: 6),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 32),
+                              child: Text(
+                                subtitle,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  height: 1.35,
                                 ),
                               ),
-                            ],
+                            ),
+                            const SizedBox(height: 100),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Edit Profile Button (Demo - setup all profile fields)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ProfileEditView()),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: Colors.grey[400]!),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.edit_outlined, size: 20, color: Colors.black),
-                        SizedBox(width: 8),
-                        Text(
-                          'Edit Profile',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                    // In the header Stack so taps aren’t swallowed by the first sliver
+                    // when the next sliver is translated upward (overlap).
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 12,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            fadeSlideRoute(const ProfileEditView()),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: Colors.grey[400]!),
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.edit_outlined, size: 20, color: Colors.black87),
+                            SizedBox(width: 8),
+                            Text(
+                              'Edit profile',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Transform.translate(
+                  offset: const Offset(0, -72),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 84),
+                        const SizedBox(height: 16),
+                        Material(
+                          elevation: 8,
+                          shadowColor: Colors.black.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(28),
+                          color: Colors.white,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: _profileNavyMid,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(Icons.tune_rounded,
+                                          color: Colors.white, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'User preferences',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: _profileNavyTop,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                const _ProfilePreferencesForm(embedded: true),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => _handleLogout(context, authVM),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[600],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.logout, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Logout',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-
-                // User Preferences Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: OutlinedButton(
-                    onPressed: () => _showSchedulePreferencesSheet(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: Colors.grey[400]!),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.schedule, size: 20, color: Colors.black),
-                        SizedBox(width: 8),
-                        Text(
-                          'User preferences',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Logout Button (Temporary - for testing)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: ElevatedButton(
-                    onPressed: () => _handleLogout(context, authVM),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[600],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.logout, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
-    );
-  }
-
-  void _showSchedulePreferencesSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => const _SchedulePreferencesSheet(),
     );
   }
 
@@ -352,14 +428,17 @@ class ProfileView extends StatelessWidget {
   }
 }
 
-class _SchedulePreferencesSheet extends StatefulWidget {
-  const _SchedulePreferencesSheet();
+class _ProfilePreferencesForm extends StatefulWidget {
+  const _ProfilePreferencesForm({this.embedded = true});
+
+  /// When true, preferences are shown in the profile page (no sheet [Navigator.pop] after save).
+  final bool embedded;
 
   @override
-  State<_SchedulePreferencesSheet> createState() => _SchedulePreferencesSheetState();
+  State<_ProfilePreferencesForm> createState() => _ProfilePreferencesFormState();
 }
 
-class _SchedulePreferencesSheetState extends State<_SchedulePreferencesSheet> {
+class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
   int _breakDuration = 10;
   int _breakAfter = 0; // 0 = after every task
   late final TextEditingController _breakDurationController;
@@ -486,42 +565,12 @@ class _SchedulePreferencesSheetState extends State<_SchedulePreferencesSheet> {
   Widget build(BuildContext context) {
     final prefsVM = Provider.of<UserPreferencesViewModel>(context, listen: false);
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          16 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'User preferences',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             _loading
                 ? const Center(
                     child: Padding(
@@ -574,8 +623,8 @@ class _SchedulePreferencesSheetState extends State<_SchedulePreferencesSheet> {
                         ],
                       ),
                       _sectionCard(
-                        icon: Icons.notifications_active_outlined,
-                        title: 'Reminders & notifications',
+                        icon: Icons.schedule_outlined,
+                        title: 'Reminders & quiet hours',
                         children: [
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
@@ -719,11 +768,13 @@ class _SchedulePreferencesSheetState extends State<_SchedulePreferencesSheet> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          const SizedBox(width: 8),
+                          if (!widget.embedded) ...[
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           FilledButton(
                             onPressed: _saving
                                 ? null
@@ -783,7 +834,9 @@ class _SchedulePreferencesSheetState extends State<_SchedulePreferencesSheet> {
                                         timerVibrationEnabled: _timerVibrationEnabled,
                                       );
                                       if (mounted) {
-                                        Navigator.pop(context);
+                                        if (!widget.embedded) {
+                                          Navigator.pop(context);
+                                        }
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           const SnackBar(
                                             content: Text('User preferences saved'),
@@ -821,7 +874,75 @@ class _SchedulePreferencesSheetState extends State<_SchedulePreferencesSheet> {
                       ),
                     ],
                   ),
-          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Subtle wave lines on the navy header.
+class _ProfileWavePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final w = size.width;
+    final h = size.height;
+    for (var i = 0; i < 6; i++) {
+      final path = Path();
+      final y = h * (0.05 + i * 0.16);
+      path.moveTo(0, y);
+      for (var x = 0.0; x < w; x += 24) {
+        path.quadraticBezierTo(x + 12, y + (i.isEven ? 5.0 : -5.0), x + 24, y);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GoldRingAvatar extends StatelessWidget {
+  const _GoldRingAvatar({
+    required this.radius,
+    required this.profileImageUrl,
+  });
+
+  final double radius;
+  final String? profileImageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = profileImageUrl != null && profileImageUrl!.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: _profileGold, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: _profileGold.withValues(alpha: 0.35),
+            blurRadius: 12,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: _profileGoldInner.withValues(alpha: 0.85), width: 1),
+        ),
+        child: CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.white.withValues(alpha: 0.15),
+          backgroundImage: hasImage ? NetworkImage(profileImageUrl!) : null,
+          child: !hasImage
+              ? Icon(Icons.person_rounded, size: radius * 0.95, color: Colors.white70)
+              : null,
         ),
       ),
     );

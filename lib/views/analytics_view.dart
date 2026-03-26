@@ -2,7 +2,29 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../theme/app_colors.dart';
 import '../viewmodels/analytics_viewmodel.dart';
+import '../navigation/sidebar_drawer_controller.dart';
+
+/// Task / focus timer bar palette (category row + segment pills).
+const _axOuter = Color(0xFFD6E6FF);
+const _axFill = Color(0xFFEAF3FF);
+const _axBorder = Color(0xFFB6D3FF);
+const _axBlue = Color(0xFF103A8A);
+
+/// Standard analytics typography: section titles larger than body values.
+const double _kTitleCard = 18;
+const double _kDialogTitle = 20;
+const double _kStatLineTitle = 14;
+const double _kStatLineValue = 12;
+const double _kBody = 13;
+const double _kCaption = 11;
+const double _kTab = 14;
+const double _kWeekDate = 14;
+const double _kScoreHero = 40;
+const double _kScoreDenom = 20;
+/// Focus Timer tab: metric values (larger + bolder than body for scanability).
+const double _kFocusMetricValue = 24;
 
 class AnalyticsView extends StatelessWidget {
   const AnalyticsView({super.key});
@@ -10,7 +32,7 @@ class AnalyticsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: AppColors.base,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -37,32 +59,90 @@ class AnalyticsView extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    // Must match `MainShell` bottom-nav colors for consistent look.
+    const navBg = Color(0xFFEAF3FF); // light blue header background
+    const navBlue = Color(0xFF103A8A); // darker blue for title
+    const menuCircleBg = Color(0xFF0F2E5C); // dark circle for menu button
+    const double subtitleFontSize = 12.0;
+    const double subtitleLineHeight = 1.2;
+    final double subtitleBoxHeight = subtitleFontSize * subtitleLineHeight * 2;
+
     return SliverToBoxAdapter(
-      child: Container(
-        width: double.infinity,
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Analytics',
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-                letterSpacing: -0.5,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: navBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF132A5D).withValues(alpha: 0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
               ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Material(
+                  color: menuCircleBg,
+                  elevation: 2,
+                  shadowColor: menuCircleBg.withValues(alpha: 0.25),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      SidebarDrawerController.scaffoldKey.currentState?.openDrawer();
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.menu, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Analytics',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                          color: navBlue,
+                          fontSize: 21,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      SizedBox(
+                        height: subtitleBoxHeight,
+                        child: Text(
+                          'Torture the data, and it will confess to anything. — Ronald Coase',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: navBlue.withValues(alpha: 0.55),
+                            fontWeight: FontWeight.w500,
+                            height: subtitleLineHeight,
+                            fontSize: subtitleFontSize,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Track your productivity journey',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -76,13 +156,10 @@ class AnalyticsView extends StatelessWidget {
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 360;
             return Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: compact ? 10 : 14,
-                vertical: compact ? 8 : 10,
-              ),
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
+                color: _axOuter,
+                borderRadius: BorderRadius.circular(25),
               ),
               child: Row(
                 children: [
@@ -93,7 +170,7 @@ class AnalyticsView extends StatelessWidget {
                       child: Icon(
                         CupertinoIcons.chevron_left,
                         size: compact ? 16 : 18,
-                        color: Colors.grey[700],
+                        color: _axBlue,
                       ),
                     ),
                   ),
@@ -108,18 +185,18 @@ class AnalyticsView extends StatelessWidget {
                           Icon(
                             CupertinoIcons.calendar,
                             size: compact ? 16 : 18,
-                            color: Colors.grey[700],
+                            color: _axBlue,
                           ),
                           SizedBox(width: compact ? 6 : 8),
                           Flexible(
                             child: Text(
                               vm.selectedWeekLabel,
                               style: TextStyle(
-                                fontSize: compact ? 13 : 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[800],
+                                fontSize: compact ? _kBody : _kWeekDate,
+                                fontWeight: FontWeight.w600,
+                                color: _axBlue,
                               ),
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -130,7 +207,7 @@ class AnalyticsView extends StatelessWidget {
                                 width: 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.25),
+                                  color: _axBorder.withValues(alpha: 0.9),
                                   shape: BoxShape.circle,
                                 ),
                               )
@@ -139,15 +216,16 @@ class AnalyticsView extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: _axFill,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: _axBorder, width: 1),
                                 ),
                                 child: const Text(
                                   'This week',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: _kCaption,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
+                                    color: _axBlue,
                                   ),
                                 ),
                               ),
@@ -164,8 +242,9 @@ class AnalyticsView extends StatelessWidget {
                       child: Icon(
                         CupertinoIcons.chevron_right,
                         size: compact ? 16 : 18,
-                        color:
-                            vm.canGoToNextWeek ? Colors.grey[700] : Colors.grey[400],
+                        color: vm.canGoToNextWeek
+                            ? _axBlue
+                            : _axBlue.withValues(alpha: 0.35),
                       ),
                     ),
                   ),
@@ -214,9 +293,9 @@ class AnalyticsView extends StatelessWidget {
                       const Text(
                         'Select Week',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: _kDialogTitle,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: _axBlue,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -224,11 +303,11 @@ class AnalyticsView extends StatelessWidget {
                         data: Theme.of(ctx).copyWith(
                           datePickerTheme: DatePickerThemeData(
                             dayForegroundColor:
-                                const WidgetStatePropertyAll(Colors.black87),
+                                const WidgetStatePropertyAll(_axBlue),
                             dayBackgroundColor: WidgetStateProperty.resolveWith(
                                 (Set<WidgetState> states) {
                               if (states.contains(WidgetState.selected)) {
-                                return Colors.grey.shade300;
+                                return _axFill;
                               }
                               return null;
                             }),
@@ -240,7 +319,7 @@ class AnalyticsView extends StatelessWidget {
                                   borderRadius:
                                       const BorderRadius.all(Radius.circular(8)),
                                   side: const BorderSide(
-                                      color: Color(0xFF616161), width: 2),
+                                      color: _axBorder, width: 2),
                                 );
                               }
                               return const RoundedRectangleBorder(
@@ -249,11 +328,11 @@ class AnalyticsView extends StatelessWidget {
                               );
                             }),
                             todayForegroundColor:
-                                const WidgetStatePropertyAll(Color(0xFF1976D2)),
+                                const WidgetStatePropertyAll(_axBlue),
                             todayBackgroundColor:
-                                const WidgetStatePropertyAll(Color(0xFFE3F2FD)),
+                                const WidgetStatePropertyAll(_axFill),
                             todayBorder: const BorderSide(
-                                color: Color(0xFF1976D2), width: 1.5),
+                                color: _axBlue, width: 1.5),
                           ),
                         ),
                         child: SizedBox(
@@ -275,9 +354,20 @@ class AnalyticsView extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: TextButton(
+                            child: OutlinedButton(
                               onPressed: () => Navigator.of(ctx).pop(),
-                              child: const Text('Cancel'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _axBlue,
+                                side: const BorderSide(color: _axBorder, width: 1.5),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -288,10 +378,17 @@ class AnalyticsView extends StatelessWidget {
                                 vm.goToCurrentWeek();
                               },
                               style: FilledButton.styleFrom(
-                                backgroundColor: Colors.black,
+                                backgroundColor: _axBlue,
                                 foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                               ),
-                              child: const Text('This Week'),
+                              child: const Text(
+                                'This week',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
                         ],
@@ -323,10 +420,11 @@ class AnalyticsView extends StatelessWidget {
                   final pct = (analytics.completionRate * 100).round();
                   return _summaryCard(
                     context,
-                    label: '$pct% Completion',
+                    title: 'Completion rate',
+                    value: '$pct%',
                     icon: Icons.check_circle_rounded,
-                    iconBgColor: const Color(0xFF34C759).withOpacity(0.15),
-                    iconColor: const Color(0xFF34C759),
+                    iconBgColor: _axFill,
+                    iconColor: _axBlue,
                   );
                 },
               ),
@@ -339,10 +437,11 @@ class AnalyticsView extends StatelessWidget {
                   final analytics = snap.data ?? FocusAnalytics.empty;
                   return _summaryCard(
                     context,
-                    label: '${analytics.totalFocusMinutes} Focus Min',
+                    title: 'Focus time',
+                    value: '${analytics.totalFocusMinutes} min',
                     icon: Icons.timer_outlined,
-                    iconBgColor: const Color(0xFFFF9500).withOpacity(0.15),
-                    iconColor: const Color(0xFFFF9500),
+                    iconBgColor: _axFill,
+                    iconColor: _axBlue,
                   );
                 },
               ),
@@ -355,13 +454,14 @@ class AnalyticsView extends StatelessWidget {
 
   Widget _summaryCard(
     BuildContext context, {
-    required String label,
+    required String title,
+    required String value,
     required IconData icon,
     required Color iconBgColor,
     required Color iconColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -374,26 +474,46 @@ class AnalyticsView extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: iconBgColor,
               shape: BoxShape.circle,
+              border: Border.all(color: _axBorder, width: 1),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: _kStatLineTitle,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    color: _axBlue,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: _kStatLineValue,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    color: _axBlue.withValues(alpha: 0.88),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
             ),
           ),
         ],
@@ -408,23 +528,30 @@ class AnalyticsView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(999),
+              color: _axOuter,
+              borderRadius: BorderRadius.circular(25),
             ),
             child: TabBar(
+              padding: EdgeInsets.zero,
+              indicatorPadding: EdgeInsets.zero,
               indicator: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(999),
+                color: _axFill,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _axBorder, width: 2),
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.grey[800],
+              labelColor: _axBlue,
+              unselectedLabelColor: _axBlue,
               labelStyle: const TextStyle(
-                fontSize: 14,
+                fontSize: _kTab,
                 fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: _kTab,
+                fontWeight: FontWeight.w500,
               ),
               tabs: const [
                 Tab(text: 'Productivity'),
@@ -469,7 +596,17 @@ class _ProductivityTabState extends State<_ProductivityTab> {
   Widget build(BuildContext context) {
     final vm = context.watch<AnalyticsViewModel>();
     if (vm.userId == null || vm.userId!.isEmpty) {
-      return const Center(child: Text('Sign in to see productivity insights'));
+      return Center(
+        child: Text(
+          'Sign in to see productivity insights',
+          style: TextStyle(
+            fontSize: _kBody,
+            fontWeight: FontWeight.w500,
+            color: _axBlue.withValues(alpha: 0.75),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
     }
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
@@ -505,9 +642,9 @@ class _ProductivityTabState extends State<_ProductivityTab> {
               Text(
                 'Completed $completed/$total',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: _kBody,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: _axBlue,
                 ),
               ),
               const SizedBox(height: 12),
@@ -516,16 +653,16 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                 child: LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
                   minHeight: 8,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF34C759)),
+                  backgroundColor: _axOuter,
+                  valueColor: const AlwaysStoppedAnimation<Color>(_axBlue),
                 ),
               ),
               const SizedBox(height: 10),
               Text(
                 "You've completed $completed out of $total total tasks",
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
+                  fontSize: _kCaption,
+                  color: _axBlue.withValues(alpha: 0.55),
                 ),
               ),
             ],
@@ -566,7 +703,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                             Container(
                               height: h.clamp(4.0, maxHeight),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF6C63FF).withOpacity(0.7),
+                                color: _axBlue.withValues(alpha: 0.55),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -574,8 +711,9 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                             Text(
                               i < labels.length ? labels[i] : '',
                               style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
+                                fontSize: _kCaption,
+                                color: _axBlue.withValues(alpha: 0.55),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -607,7 +745,10 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
                     'No tasks by category yet',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: _kBody,
+                      color: _axBlue.withValues(alpha: 0.55),
+                    ),
                   ),
                 )
               : Column(
@@ -621,9 +762,9 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                                   child: Text(
                                     c.categoryName,
                                     style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black87,
+                                      fontSize: _kBody,
+                                      fontWeight: FontWeight.w600,
+                                      color: _axBlue,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -631,10 +772,10 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                                 const SizedBox(width: 8),
                                 Text(
                                   '${c.count}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                    fontWeight: FontWeight.w500,
+                                  style: const TextStyle(
+                                    fontSize: _kBody,
+                                    color: _axBlue,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -644,8 +785,8 @@ class _ProductivityTabState extends State<_ProductivityTab> {
                                     child: LinearProgressIndicator(
                                       value: maxCount > 0 ? (c.count / maxCount).clamp(0.0, 1.0) : 0,
                                       minHeight: 8,
-                                      backgroundColor: Colors.grey[200],
-                                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6C63FF)),
+                                      backgroundColor: _axOuter,
+                                      valueColor: const AlwaysStoppedAnimation<Color>(_axBlue),
                                     ),
                                   ),
                                 ),
@@ -673,18 +814,18 @@ class _ProductivityTabState extends State<_ProductivityTab> {
               Text(
                 '${a.productivityScore}',
                 style: const TextStyle(
-                  fontSize: 48,
+                  fontSize: _kScoreHero,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF6C63FF),
+                  color: _axBlue,
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 '/ 100',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: _kScoreDenom,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey,
+                  color: _axBlue.withValues(alpha: 0.45),
                 ),
               ),
             ],
@@ -715,9 +856,9 @@ class _ProductivityTabState extends State<_ProductivityTab> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: _kTitleCard,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: _axBlue,
             ),
           ),
           const SizedBox(height: 16),
@@ -749,7 +890,17 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
   Widget build(BuildContext context) {
     final vm = context.watch<AnalyticsViewModel>();
     if (vm.userId == null || vm.userId!.isEmpty) {
-      return const Center(child: Text('Sign in to see focus insights'));
+      return Center(
+        child: Text(
+          'Sign in to see focus insights',
+          style: TextStyle(
+            fontSize: _kBody,
+            fontWeight: FontWeight.w500,
+            color: _axBlue.withValues(alpha: 0.75),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
     }
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
@@ -781,9 +932,11 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
           child: Text(
             value(a),
             style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              fontSize: _kFocusMetricValue,
+              fontWeight: FontWeight.bold,
+              height: 1.25,
+              letterSpacing: -0.3,
+              color: _axBlue,
             ),
           ),
         );
@@ -805,18 +958,18 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
               Text(
                 '${a.focusScore}',
                 style: const TextStyle(
-                  fontSize: 48,
+                  fontSize: _kScoreHero,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFFF9500),
+                  color: _axBlue,
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 '/ 100',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: _kScoreDenom,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey,
+                  color: _axBlue.withValues(alpha: 0.45),
                 ),
               ),
             ],
@@ -847,9 +1000,9 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: _kTitleCard,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: _axBlue,
             ),
           ),
           const SizedBox(height: 16),
