@@ -6,9 +6,27 @@ class UserPreferencesViewModel extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   String? _userId;
 
+  /// Stable stream per signed-in user so [StreamBuilder] does not resubscribe every frame.
+  Stream<UserPreferencesModel?>? _cachedPrefsStream;
+  String? _cachedPrefsStreamUserId;
+
   void setUserId(String? userId) {
+    if (_userId != userId) {
+      _cachedPrefsStream = null;
+      _cachedPrefsStreamUserId = null;
+      _optimisticTheme = null;
+    }
     _userId = userId;
     notifyListeners();
+  }
+
+  /// While Firestore syncs, we show this theme immediately for responsive UI.
+  String? _optimisticTheme;
+
+  /// Resolved theme for UI: optimistic tap first, then prefs stream, then default.
+  String themeResolved(String? prefsTheme) {
+    if (_optimisticTheme != null) return _optimisticTheme!;
+    return prefsTheme ?? 'light';
   }
 
   String? get userId => _userId;
@@ -18,11 +36,21 @@ class UserPreferencesViewModel extends ChangeNotifier {
   /// Stream of current user's preferences. Returns null when logged out or doc missing.
   Stream<UserPreferencesModel?> get preferencesStream {
     final uid = _userId;
-    if (uid == null || uid.isEmpty) return Stream.value(null);
-    return _db.collection(_collection).doc(uid).snapshots().map((doc) {
-      if (!doc.exists || doc.data() == null) return null;
-      return UserPreferencesModel.fromMap(doc.data()!, doc.id);
-    });
+    if (uid == null || uid.isEmpty) {
+      return Stream<UserPreferencesModel?>.value(null);
+    }
+    if (_cachedPrefsStreamUserId != uid || _cachedPrefsStream == null) {
+      _cachedPrefsStreamUserId = uid;
+      _cachedPrefsStream = _db.collection(_collection).doc(uid).snapshots().map((doc) {
+        if (!doc.exists || doc.data() == null) return null;
+        final prefs = UserPreferencesModel.fromMap(doc.data()!, doc.id);
+        if (_optimisticTheme != null && prefs.theme == _optimisticTheme) {
+          _optimisticTheme = null;
+        }
+        return prefs;
+      });
+    }
+    return _cachedPrefsStream!;
   }
 
   /// One-time fetch. Returns null if doc does not exist.
@@ -101,9 +129,17 @@ class UserPreferencesViewModel extends ChangeNotifier {
     await update(map);
   }
 
-  /// Update theme.
+  /// Update theme (applies optimistically, then persists to Firestore).
   Future<void> updateTheme(String theme) async {
-    await update({'theme': theme});
+    _optimisticTheme = theme;
+    notifyListeners();
+    try {
+      await update({'theme': theme});
+    } catch (e) {
+      _optimisticTheme = null;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   /// Update reminder preferences.

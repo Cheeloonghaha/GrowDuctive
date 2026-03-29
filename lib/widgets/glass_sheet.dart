@@ -19,15 +19,22 @@ class GlassSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fill = isDark
+        ? scheme.surfaceContainerHigh.withValues(alpha: 0.94)
+        : AppColors.glassFill;
+    final borderColor =
+        isDark ? scheme.outline.withValues(alpha: 0.45) : AppColors.glassBorder;
     return ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: AppColors.glassFill,
+            color: fill,
             borderRadius: borderRadius,
-            border: Border.all(color: AppColors.glassBorder, width: 1),
+            border: Border.all(color: borderColor, width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.08),

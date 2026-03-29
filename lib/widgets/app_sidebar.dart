@@ -21,12 +21,10 @@ class AppSidebar extends StatelessWidget {
   static const _navBlue = Color(0xFF103A8A);
   static const _navBg = Color(0xFFEAF3FF);
 
-  bool _isDarkTheme(String? theme) => theme == 'dark';
-
   @override
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
-    final prefsVM = Provider.of<UserPreferencesViewModel>(context, listen: false);
+    final prefsVM = context.watch<UserPreferencesViewModel>();
 
     return Drawer(
       width: 320,
@@ -44,7 +42,38 @@ class AppSidebar extends StatelessWidget {
               stream: prefsVM.preferencesStream,
               builder: (context, prefsSnap) {
                 final prefs = prefsSnap.data;
-                final isDark = _isDarkTheme(prefs?.theme);
+                final resolvedTheme = prefsVM.themeResolved(prefs?.theme);
+                // Match the live app theme (MaterialApp), not only the last Firestore snapshot —
+                // otherwise the drawer can stay light until the stream re-emits after a theme change.
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+
+                // Light/Dark toggles: derive selection from prefs when present; otherwise from
+                // visible brightness. Fixes (1) prefs==null → themeResolved defaults to 'light'
+                // while the app is already dark, (2) stored 'system' — map to light/dark by device.
+                bool lightThemeSelected;
+                bool darkThemeSelected;
+                if (prefs == null) {
+                  lightThemeSelected = !isDark;
+                  darkThemeSelected = isDark;
+                } else if (resolvedTheme == 'dark') {
+                  lightThemeSelected = false;
+                  darkThemeSelected = true;
+                } else if (resolvedTheme == 'light') {
+                  lightThemeSelected = true;
+                  darkThemeSelected = false;
+                } else {
+                  // 'system' (or unknown): match what MaterialApp is showing
+                  lightThemeSelected = !isDark;
+                  darkThemeSelected = isDark;
+                }
+                // If stored preference and visible theme disagree (stream lag), trust the UI.
+                if (lightThemeSelected && isDark) {
+                  lightThemeSelected = false;
+                  darkThemeSelected = true;
+                } else if (darkThemeSelected && !isDark) {
+                  darkThemeSelected = false;
+                  lightThemeSelected = true;
+                }
 
                 final bg = isDark ? const Color(0xFF0B0F19) : Colors.white;
                 final fg = isDark ? Colors.white : Colors.black87;
@@ -155,7 +184,7 @@ class AppSidebar extends StatelessWidget {
                                         context: context,
                                         isDark: isDark,
                                         label: 'Light',
-                                        selected: prefs?.theme == 'light',
+                                        selected: lightThemeSelected,
                                         icon: Icons.wb_sunny_rounded,
                                         onTap: () => prefsVM.updateTheme('light'),
                                       ),
@@ -166,7 +195,7 @@ class AppSidebar extends StatelessWidget {
                                         context: context,
                                         isDark: isDark,
                                         label: 'Dark',
-                                        selected: prefs?.theme == 'dark',
+                                        selected: darkThemeSelected,
                                         icon: Icons.nightlight_round_rounded,
                                         onTap: () => prefsVM.updateTheme('dark'),
                                       ),
@@ -259,8 +288,10 @@ class AppSidebar extends StatelessWidget {
                               onPressed: () async {
                                 final shouldLogout = await showDialog<bool>(
                                   context: context,
-                                  barrierColor: Colors.black.withOpacity(0.5),
-                                  builder: (ctx) => Dialog(
+                                  barrierColor: Colors.black.withValues(alpha: 0.5),
+                                  builder: (dialogCtx) {
+                                    final scheme = Theme.of(dialogCtx).colorScheme;
+                                    return Dialog(
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -273,44 +304,46 @@ class AppSidebar extends StatelessWidget {
                                         children: [
                                           Container(
                                             padding: const EdgeInsets.all(20),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.black,
-                                              borderRadius: BorderRadius.only(
+                                            decoration: BoxDecoration(
+                                              color: scheme.inverseSurface,
+                                              borderRadius: const BorderRadius.only(
                                                 topLeft: Radius.circular(16),
                                                 topRight: Radius.circular(16),
                                               ),
                                             ),
                                             child: Row(
                                               children: [
-                                                const Icon(
+                                                Icon(
                                                   Icons.logout,
-                                                  color: Colors.white,
+                                                  color: scheme.onInverseSurface,
                                                   size: 24,
                                                 ),
                                                 const SizedBox(width: 12),
-                                                const Expanded(
+                                                Expanded(
                                                   child: Text(
                                                     "Logout",
                                                     style: TextStyle(
                                                       fontSize: 20,
                                                       fontWeight: FontWeight.bold,
-                                                      color: Colors.white,
+                                                      color: scheme.onInverseSurface,
                                                     ),
                                                   ),
                                                 ),
                                                 GestureDetector(
                                                   onTap: () =>
-                                                      Navigator.pop(ctx, false),
-                                                  child: const Icon(
+                                                      Navigator.pop(dialogCtx, false),
+                                                  child: Icon(
                                                     Icons.close,
-                                                    color: Colors.white,
+                                                    color: scheme.onInverseSurface,
                                                     size: 24,
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                          Padding(
+                                          Container(
+                                            width: double.infinity,
+                                            color: scheme.surfaceContainerHigh,
                                             padding: const EdgeInsets.all(20),
                                             child: Column(
                                               children: [
@@ -318,7 +351,7 @@ class AppSidebar extends StatelessWidget {
                                                   "Are you sure you want to logout?",
                                                   style: TextStyle(
                                                     fontSize: 15,
-                                                    color: Colors.grey[800],
+                                                    color: scheme.onSurface,
                                                     fontWeight: FontWeight.w500,
                                                   ),
                                                   textAlign: TextAlign.center,
@@ -329,11 +362,13 @@ class AppSidebar extends StatelessWidget {
                                                   children: [
                                                     OutlinedButton(
                                                       onPressed: () =>
-                                                          Navigator.pop(ctx, false),
+                                                          Navigator.pop(dialogCtx, false),
                                                       style: OutlinedButton.styleFrom(
                                                         side: BorderSide(
-                                                          color: Colors.grey[400]!,
+                                                          color: scheme.outline
+                                                              .withValues(alpha: 0.65),
                                                         ),
+                                                        foregroundColor: scheme.onSurface,
                                                         shape: RoundedRectangleBorder(
                                                           borderRadius: BorderRadius.circular(8),
                                                         ),
@@ -342,10 +377,9 @@ class AppSidebar extends StatelessWidget {
                                                           vertical: 12,
                                                         ),
                                                       ),
-                                                      child: Text(
+                                                      child: const Text(
                                                         "Cancel",
                                                         style: TextStyle(
-                                                          color: Colors.grey[700],
                                                           fontWeight: FontWeight.w600,
                                                         ),
                                                       ),
@@ -353,10 +387,10 @@ class AppSidebar extends StatelessWidget {
                                                     const SizedBox(width: 12),
                                                     ElevatedButton(
                                                       onPressed: () =>
-                                                          Navigator.pop(ctx, true),
+                                                          Navigator.pop(dialogCtx, true),
                                                       style: ElevatedButton.styleFrom(
-                                                        backgroundColor: Colors.red[600],
-                                                        foregroundColor: Colors.white,
+                                                        backgroundColor: scheme.error,
+                                                        foregroundColor: scheme.onError,
                                                         shape: RoundedRectangleBorder(
                                                           borderRadius:
                                                               BorderRadius.circular(8),
@@ -381,7 +415,8 @@ class AppSidebar extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                  ),
+                                  );
+                                  },
                                 );
 
                                 if (shouldLogout != true) return;

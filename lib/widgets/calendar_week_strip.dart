@@ -138,8 +138,8 @@ class CalendarWeekStrip extends StatelessWidget {
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: taskCount > 0
-                                    ? Colors.black
-                                    : muted.withValues(alpha: 0.5),
+                                    ? primary
+                                    : muted.withValues(alpha: 0.55),
                                 height: 1,
                               ),
                             ),

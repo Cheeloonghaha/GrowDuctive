@@ -299,13 +299,18 @@ class FocusTimerView extends StatelessWidget {
     final isShort = vm.phase == FocusTimerPhase.shortBreak;
     final isLong = vm.phase == FocusTimerPhase.longBreak;
 
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? scheme.surfaceContainerHigh : Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: isDark
+            ? Border.all(color: scheme.outline.withValues(alpha: 0.35))
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -394,7 +399,7 @@ class FocusTimerView extends StatelessWidget {
               value: vm.currentPhaseDuration > 0
                   ? ((vm.currentPhaseDuration - vm.remainingSeconds) / vm.currentPhaseDuration).clamp(0.0, 1.0)
                   : 0,
-              backgroundColor: Colors.grey[300],
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation<Color>(context.chrome.navBlue),
             ),
           ),
@@ -445,7 +450,7 @@ class FocusTimerView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          const Divider(),
+          Divider(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.25)),
           const SizedBox(height: 12),
 
           // Sessions today — completed only (from Firestore)
@@ -530,7 +535,7 @@ class FocusTimerView extends StatelessWidget {
                       'No sessions today',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   )
@@ -541,7 +546,7 @@ class FocusTimerView extends StatelessWidget {
                     itemCount: sessions.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
-                      return _buildSessionTile(sessions[index]);
+                      return _buildSessionTile(context, sessions[index]);
                     },
                   ),
               ],
@@ -552,7 +557,7 @@ class FocusTimerView extends StatelessWidget {
     );
   }
 
-  Widget _buildSessionTile(FocusSessionModel session) {
+  Widget _buildSessionTile(BuildContext context, FocusSessionModel session) {
     final displayStatus = getSessionDisplayStatus(session);
     final status = displayStatus == FocusSessionDisplayStatus.completed
         ? 'Completed'
@@ -572,21 +577,27 @@ class FocusTimerView extends StatelessWidget {
     final durationStr =
         '${durationMin}m ${durationSec}s';
 
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? scheme.surfaceContainerHigh : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isDark
+              ? scheme.outline.withValues(alpha: 0.35)
+              : Colors.grey.shade200,
+        ),
       ),
       child: Row(
         children: [
           Text(
             timeStr,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(width: 16),
@@ -595,7 +606,7 @@ class FocusTimerView extends StatelessWidget {
               durationStr,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[700],
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ),

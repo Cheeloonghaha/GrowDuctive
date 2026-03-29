@@ -690,6 +690,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildCompletedSectionHeader(int count) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => setState(() => _completedSectionExpanded = !_completedSectionExpanded),
       behavior: HitTestBehavior.opaque,
@@ -699,25 +700,25 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
           children: [
             Text(
               'Completed',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: scheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '$count',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  color: scheme.onSurface,
                 ),
               ),
             ),
@@ -725,7 +726,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
             Icon(
               _completedSectionExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
               size: 24,
-              color: Colors.grey[700],
+              color: scheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -739,8 +740,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
 
   // Show More menu for category management
   void _showMoreMenu(BuildContext context, TaskViewModel vm, List<CategoryModel> categories) {
+    final sheetBg = Theme.of(context).colorScheme.surfaceContainerHigh;
     showModalBottomSheet(
       context: context,
+      backgroundColor: sheetBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -805,6 +808,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final fg = isDestructive ? scheme.error : scheme.onSurface;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -814,7 +819,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
             Icon(
               icon,
               size: 22,
-              color: isDestructive ? Colors.red : Colors.black,
+              color: fg,
             ),
             const SizedBox(width: 16),
             Text(
@@ -822,7 +827,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: isDestructive ? Colors.red : Colors.black,
+                color: fg,
               ),
             ),
           ],
@@ -959,24 +964,38 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         task.importance >= 4 ? AppColors.softGold : AppColors.interactive;
     const titleSize = 13.0;
     const pad = 12.0;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final cardBg = isDark ? scheme.surfaceContainerHigh : AppColors.surface;
+    final cardBorder = task.overdue
+        ? AppColors.coral
+        : (isDark
+            ? scheme.outline.withValues(alpha: 0.38)
+            : AppColors.borderSubtle);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _showViewTaskDialog(context, vm, task),
+        onTap: () => _showViewTaskDialog(
+          context,
+          vm,
+          task,
+          categoryName: categoryName,
+          categoryPastel: pastel,
+        ),
         borderRadius: BorderRadius.circular(24),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: cardBg,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: task.overdue ? AppColors.coral : AppColors.borderSubtle,
+              color: cardBorder,
               width: task.overdue ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 16,
+                color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.05),
+                blurRadius: isDark ? 12 : 16,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -1029,7 +1048,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                           fontSize: titleSize,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
-                          color: task.isCompleted ? Colors.grey[500]! : const Color(0xFF1C1C1E),
+                          color: task.isCompleted
+                              ? scheme.onSurfaceVariant
+                              : scheme.onSurface,
                           decoration: task.isCompleted ? TextDecoration.lineThrough : null,
                         ),
                         maxLines: 2,
@@ -1045,7 +1066,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           onPressed: () => _showEditTaskDialog(context, vm, task),
-                          icon: Icon(Icons.edit_outlined, color: Colors.grey[700], size: 20),
+                          icon: Icon(Icons.edit_outlined, color: scheme.onSurfaceVariant, size: 20),
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
@@ -1172,190 +1193,270 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
 
-  // View task details dialog - Redesigned with black/white/gray
-  void _showViewTaskDialog(BuildContext context, TaskViewModel vm, TaskModel task) {
+  // View task details dialog - improved information layout
+  void _showViewTaskDialog(
+    BuildContext context,
+    TaskViewModel vm,
+    TaskModel task, {
+    required String categoryName,
+    required Color categoryPastel,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    // Category-accent color used across border + stripe.
+    final borderColor = Color.alphaBlend(
+      (isDark ? Colors.white : Colors.black).withValues(alpha: 0.22),
+      categoryPastel,
+    );
+    final titleColor = scheme.onSurface;
+    final bodyColor = scheme.onSurface.withValues(alpha: 0.72);
+
+    String prettyDuration(int minutes) {
+      if (minutes <= 0) return '0m';
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      if (h <= 0) return '${m}m';
+      if (m == 0) return '${h}h';
+      return '${h}h ${m}m';
+    }
+
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: borderColor, width: 3.5),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
             children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.task_alt, color: Colors.white, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        "Task Details",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
-                    ),
-                  ],
+              // Category stripe for stronger emphasis.
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 6,
+                  color: borderColor,
                 ),
               ),
-              
-              // Content
               Container(
-                padding: const EdgeInsets.all(20),
+                constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Task Title
-                    Text(
-                      task.title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    if (task.description.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        task.description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    
-                    // Stats Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatItem(
-                            "Urgency",
-                            task.urgency.toString(),
-                            Icons.flag_outlined,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatItem(
-                            "Importance",
-                            task.importance.toString(),
-                            Icons.star_outline,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatItem(
-                            "Duration",
-                            "${task.duration}m",
-                            Icons.timer_outlined,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Status
+                    // Header
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: task.isCompleted ? Colors.grey[200] : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: task.isCompleted ? Colors.black : Colors.grey[300]!,
-                          width: 1,
+                        color: scheme.surface,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: borderColor.withValues(alpha: 0.35),
+                          ),
                         ),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                            color: task.isCompleted ? Colors.black : Colors.grey[600],
-                            size: 20,
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: borderColor.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(Icons.task_alt, color: borderColor, size: 18),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            task.isCompleted ? "Completed" : "Active",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: task.isCompleted ? Colors.black : Colors.grey[700],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              "Task Details",
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: titleColor,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Icon(
+                              Icons.close,
+                              color: scheme.onSurface.withValues(alpha: 0.7),
+                              size: 22,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              
-              // Action Buttons
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showEditTaskDialog(context, vm, task);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: Colors.black),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          "Edit",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w600,
-                          ),
+
+                    // Content
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Title + Category chip
+                            Text(
+                              task.title,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: titleColor,
+                                height: 1.15,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: categoryPastel.withValues(
+                                      alpha: isDark ? 0.22 : 1.0,
+                                    ),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: borderColor.withValues(alpha: 0.95),
+                                      width: 1.25,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.sell_outlined,
+                                        size: 16,
+                                        color: borderColor,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        categoryName,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: titleColor,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                _buildStatusPill(context, task),
+                              ],
+                            ),
+                            if (task.description.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              Text(
+                                task.description,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: bodyColor,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+
+                            // Metrics
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                _buildDetailMetric(
+                                  context,
+                                  label: 'Duration',
+                                  value: prettyDuration(task.duration),
+                                  icon: Icons.timer_outlined,
+                                  accent: borderColor,
+                                ),
+                                _buildDetailMetric(
+                                  context,
+                                  label: 'Urgency',
+                                  value: '${task.urgency}/5',
+                                  icon: Icons.flag_outlined,
+                                  accent: borderColor,
+                                ),
+                                _buildDetailMetric(
+                                  context,
+                                  label: 'Importance',
+                                  value: '${task.importance}/5',
+                                  icon: Icons.star_outline,
+                                  accent: borderColor,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          vm.toggleComplete(task.id, task.isCompleted, taskCreatedAt: task.createdAt);
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+              
+                    // Action Buttons
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showEditTaskDialog(context, vm, task);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                foregroundColor: scheme.onSurface,
+                                side: BorderSide(
+                                  color: borderColor.withValues(alpha: 0.65),
+                                  width: 1.25,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                "Edit",
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          task.isCompleted ? "Reopen" : "Complete",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                vm.toggleComplete(
+                                  task.id,
+                                  task.isCompleted,
+                                  taskCreatedAt: task.createdAt,
+                                );
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: borderColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                task.isCompleted ? "Reopen" : "Complete",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ],
@@ -1368,34 +1469,102 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
+  Widget _buildStatusPill(BuildContext context, TaskModel task) {
+    final scheme = Theme.of(context).colorScheme;
+    final label = task.isCompleted
+        ? 'Completed'
+        : (task.overdue ? 'Overdue' : 'Active');
+    final icon = task.isCompleted
+        ? Icons.check_circle
+        : (task.overdue ? Icons.warning_amber_rounded : Icons.radio_button_unchecked);
+    final Color accent = task.isCompleted
+        ? Colors.green
+        : (task.overdue ? Colors.red : scheme.primary);
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
+        color: accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.55)),
       ),
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: Colors.grey[700]),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 2),
+          Icon(icon, size: 16, color: accent),
+          const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[600],
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface,
+              height: 1.0,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDetailMetric(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color accent,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 110),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accent.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 18, color: accent),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onSurface,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface.withValues(alpha: 0.65),
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2127,17 +2296,25 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     required IconData icon,
     required List<Widget> children,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final cardFill = isDark
+        ? scheme.surfaceContainerHighest.withValues(alpha: 0.92)
+        : Colors.white.withValues(alpha: 0.52);
+    final cardBorder = isDark
+        ? scheme.outline.withValues(alpha: 0.42)
+        : Colors.white.withValues(alpha: 0.72);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        color: Colors.white.withValues(alpha: 0.52),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+        color: cardFill,
+        border: Border.all(color: cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -2152,7 +2329,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: AppColors.interactive.withValues(alpha: 0.12),
+                  color: AppColors.interactive.withValues(alpha: isDark ? 0.22 : 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, size: 20, color: AppColors.interactive),
@@ -2164,11 +2341,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.2,
-                        color: Color(0xFF1C1C1E),
+                        color: scheme.onSurface,
                       ),
                     ),
                     if (subtitle != null && subtitle.isNotEmpty) ...[
@@ -2178,7 +2355,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         style: TextStyle(
                           fontSize: 12.5,
                           height: 1.35,
-                          color: Colors.grey[600],
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -2210,16 +2387,6 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     String? addDialogError;
     var taskDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
 
-    final borderRadius = BorderRadius.circular(14);
-    final outlineBorder = OutlineInputBorder(
-      borderRadius: borderRadius,
-      borderSide: BorderSide(color: AppColors.borderSubtle),
-    );
-    final focusBorder = OutlineInputBorder(
-      borderRadius: borderRadius,
-      borderSide: const BorderSide(color: AppColors.interactive, width: 2),
-    );
-
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -2239,7 +2406,27 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 constraints: BoxConstraints(maxHeight: maxH),
                 child: StatefulBuilder(
                   builder: (context, setSheetState) {
-                    final fieldFill = Colors.white.withValues(alpha: 0.78);
+                    final theme = Theme.of(context);
+                    final scheme = theme.colorScheme;
+                    final isDark = theme.brightness == Brightness.dark;
+                    final borderRadius = BorderRadius.circular(14);
+                    final borderColor =
+                        isDark ? scheme.outline.withValues(alpha: 0.55) : AppColors.borderSubtle;
+                    final outlineBorder = OutlineInputBorder(
+                      borderRadius: borderRadius,
+                      borderSide: BorderSide(color: borderColor),
+                    );
+                    final focusBorder = OutlineInputBorder(
+                      borderRadius: borderRadius,
+                      borderSide: BorderSide(color: scheme.primary, width: 2),
+                    );
+                    final fieldFill = isDark
+                        ? scheme.surfaceContainerHighest
+                        : Colors.white.withValues(alpha: 0.78);
+                    final fieldTextStyle = TextStyle(color: scheme.onSurface, fontSize: 16);
+                    final labelStyle = TextStyle(color: scheme.onSurfaceVariant);
+                    final hintStyle =
+                        TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.75));
                     final compactDeco = InputDecoration(
                       filled: true,
                       fillColor: fieldFill,
@@ -2247,7 +2434,13 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       border: outlineBorder,
                       enabledBorder: outlineBorder,
                       focusedBorder: focusBorder,
+                      labelStyle: labelStyle,
+                      floatingLabelStyle: labelStyle,
+                      hintStyle: hintStyle,
                     );
+                    final inactiveSlider = isDark
+                        ? scheme.outline.withValues(alpha: 0.35)
+                        : AppColors.borderSubtle;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -2308,6 +2501,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                   children: [
                                     TextField(
                                       controller: titleController,
+                                      style: fieldTextStyle,
                                       decoration: compactDeco.copyWith(
                                         labelText: 'Task title',
                                         hintText: 'What do you need to do?',
@@ -2318,6 +2512,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                     const SizedBox(height: 14),
                                     TextField(
                                       controller: descriptionController,
+                                      style: fieldTextStyle,
                                       decoration: compactDeco.copyWith(
                                         labelText: 'Notes',
                                         hintText: 'Extra context (optional)',
@@ -2356,14 +2551,18 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                         child: InputDecorator(
                                           decoration: compactDeco.copyWith(
                                             labelText: 'Task date',
-                                            prefixIcon: const Icon(Icons.calendar_today_outlined, size: 22),
+                                            prefixIcon: Icon(
+                                              Icons.calendar_today_outlined,
+                                              size: 22,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
                                           ),
                                           child: Text(
                                             MaterialLocalizations.of(context).formatFullDate(taskDate),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w600,
-                                              color: Color(0xFF1C1C1E),
+                                              color: scheme.onSurface,
                                             ),
                                           ),
                                         ),
@@ -2373,13 +2572,14 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                     TextField(
                                       controller: durationController,
                                       onChanged: (_) => setSheetState(() => addDialogError = null),
+                                      style: fieldTextStyle,
                                       decoration: compactDeco.copyWith(
                                         labelText: 'Duration',
                                         hintText: 'Minutes',
                                         suffixText: 'min',
                                         suffixStyle: TextStyle(
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.grey[700],
+                                          color: scheme.onSurfaceVariant,
                                         ),
                                       ),
                                       keyboardType: TextInputType.number,
@@ -2415,7 +2615,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                                 decoration: BoxDecoration(
                                                   color: fieldFill,
                                                   borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: AppColors.borderSubtle),
+                                                  border: Border.all(color: borderColor),
                                                 ),
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2426,7 +2626,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                                         fontSize: 11,
                                                         fontWeight: FontWeight.w700,
                                                         letterSpacing: 0.3,
-                                                        color: Colors.grey[600],
+                                                        color: scheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                     const SizedBox(height: 6),
@@ -2438,8 +2638,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                                         fontSize: 15,
                                                         fontWeight: FontWeight.w600,
                                                         color: startTimeOfDay != null
-                                                            ? const Color(0xFF1C1C1E)
-                                                            : Colors.grey[500]!,
+                                                            ? scheme.onSurface
+                                                            : scheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                   ],
@@ -2478,7 +2678,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                                 decoration: BoxDecoration(
                                                   color: fieldFill,
                                                   borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: AppColors.borderSubtle),
+                                                  border: Border.all(color: borderColor),
                                                 ),
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2489,7 +2689,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                                         fontSize: 11,
                                                         fontWeight: FontWeight.w700,
                                                         letterSpacing: 0.3,
-                                                        color: Colors.grey[600],
+                                                        color: scheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                     const SizedBox(height: 6),
@@ -2501,8 +2701,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                                         fontSize: 15,
                                                         fontWeight: FontWeight.w600,
                                                         color: endTimeOfDay != null
-                                                            ? const Color(0xFF1C1C1E)
-                                                            : Colors.grey[500]!,
+                                                            ? scheme.onSurface
+                                                            : scheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                   ],
@@ -2549,11 +2749,17 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                         return DropdownButtonFormField<String>(
                                           // ignore: deprecated_member_use
                                           value: selectedCategoryId,
+                                          dropdownColor: scheme.surfaceContainerHigh,
+                                          style: fieldTextStyle,
+                                          iconEnabledColor: scheme.onSurfaceVariant,
                                           decoration: compactDeco.copyWith(labelText: 'Select category'),
                                           items: categories.map((category) {
                                             return DropdownMenuItem<String>(
                                               value: category.id,
-                                              child: Text(category.name),
+                                              child: Text(
+                                                category.name,
+                                                style: TextStyle(color: scheme.onSurface),
+                                              ),
                                             );
                                           }).toList(),
                                           onChanged: (value) {
@@ -2575,7 +2781,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
-                                        color: Colors.grey[800],
+                                        color: scheme.onSurface,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
@@ -2585,7 +2791,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                           child: SliderTheme(
                                             data: SliderThemeData(
                                               activeTrackColor: AppColors.interactive,
-                                              inactiveTrackColor: AppColors.borderSubtle,
+                                              inactiveTrackColor: inactiveSlider,
                                               thumbColor: AppColors.interactive,
                                               overlayColor: AppColors.interactive.withValues(alpha: 0.12),
                                               trackHeight: 4,
@@ -2607,15 +2813,15 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                           decoration: BoxDecoration(
                                             color: fieldFill,
                                             borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: AppColors.borderSubtle),
+                                            border: Border.all(color: borderColor),
                                           ),
                                           alignment: Alignment.center,
                                           child: Text(
                                             '$urgency',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 18,
-                                              color: Color(0xFF1C1C1E),
+                                              color: scheme.onSurface,
                                             ),
                                           ),
                                         ),
@@ -2627,7 +2833,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
-                                        color: Colors.grey[800],
+                                        color: scheme.onSurface,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
@@ -2637,7 +2843,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                           child: SliderTheme(
                                             data: SliderThemeData(
                                               activeTrackColor: AppColors.jade,
-                                              inactiveTrackColor: AppColors.borderSubtle,
+                                              inactiveTrackColor: inactiveSlider,
                                               thumbColor: AppColors.jade,
                                               overlayColor: AppColors.jade.withValues(alpha: 0.12),
                                               trackHeight: 4,
@@ -2659,15 +2865,15 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                           decoration: BoxDecoration(
                                             color: fieldFill,
                                             borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: AppColors.borderSubtle),
+                                            border: Border.all(color: borderColor),
                                           ),
                                           alignment: Alignment.center,
                                           child: Text(
                                             '$importance',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 18,
-                                              color: Color(0xFF1C1C1E),
+                                              color: scheme.onSurface,
                                             ),
                                           ),
                                         ),
@@ -2682,9 +2888,15 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         Container(
                           decoration: BoxDecoration(
                             border: Border(
-                              top: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                              top: BorderSide(
+                                color: isDark
+                                    ? scheme.outline.withValues(alpha: 0.4)
+                                    : Colors.white.withValues(alpha: 0.45),
+                              ),
                             ),
-                            color: Colors.white.withValues(alpha: 0.28),
+                            color: isDark
+                                ? scheme.surfaceContainerHigh.withValues(alpha: 0.88)
+                                : Colors.white.withValues(alpha: 0.28),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -2710,7 +2922,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                     child: Text(
                                       addDialogError!,
                                       style: TextStyle(
-                                        color: Colors.red.shade900,
+                                        color: scheme.error,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -2732,13 +2944,13 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                           onPressed: () => Navigator.pop(sheetContext),
                                           style: OutlinedButton.styleFrom(
                                             padding: const EdgeInsets.symmetric(vertical: 14),
-                                            side: const BorderSide(color: AppColors.borderSubtle),
+                                            side: BorderSide(color: borderColor),
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                           ),
                                           child: Text(
                                             'Cancel',
                                             style: TextStyle(
-                                              color: Colors.grey[800],
+                                              color: scheme.onSurface,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),

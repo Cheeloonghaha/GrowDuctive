@@ -38,7 +38,7 @@ class UserPreferencesModel {
     this.defaultReminderMinutesBefore = 15,
     this.quietHoursStartMinutes,
     this.quietHoursEndMinutes,
-    this.theme = 'system',
+    this.theme = 'light',
     required this.updatedAt,
   });
 
@@ -71,7 +71,7 @@ class UserPreferencesModel {
       quietHoursEndMinutes: data['quiet_hours_end_minutes'] != null
           ? (data['quiet_hours_end_minutes'] as num).toInt()
           : null,
-      theme: data['theme'] as String? ?? 'system',
+      theme: data['theme'] as String? ?? 'light',
       updatedAt: updated,
     );
   }

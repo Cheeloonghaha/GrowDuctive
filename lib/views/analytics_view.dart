@@ -20,6 +20,27 @@ const double _kScoreDenom = 20;
 /// Focus Timer tab: metric values (larger + bolder than body for scanability).
 const double _kFocusMetricValue = 24;
 
+/// Elevated card surface for analytics — dark mode uses [ColorScheme.surfaceContainerHigh]
+/// instead of flat white so panels match the scaffold.
+BoxDecoration _analyticsCardDecoration(BuildContext context) {
+  final scheme = Theme.of(context).colorScheme;
+  final isDark = scheme.brightness == Brightness.dark;
+  return BoxDecoration(
+    color: isDark ? scheme.surfaceContainerHigh : Colors.white,
+    borderRadius: BorderRadius.circular(24),
+    border: isDark
+        ? Border.all(color: scheme.outline.withValues(alpha: 0.38))
+        : null,
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.05),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
+      ),
+    ],
+  );
+}
+
 class AnalyticsView extends StatelessWidget {
   const AnalyticsView({super.key});
 
@@ -264,17 +285,19 @@ class AnalyticsView extends StatelessWidget {
             final screenH = MediaQuery.of(ctx).size.height;
             final maxDialogH = screenH * 0.78;
             final calendarH = (screenH * 0.42).clamp(260.0, 360.0);
+            final scheme = Theme.of(ctx).colorScheme;
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
             return ConstrainedBox(
               constraints: BoxConstraints(maxHeight: maxDialogH),
               child: SingleChildScrollView(
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: scheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
                         blurRadius: 24,
                         offset: const Offset(0, 8),
                       ),
@@ -289,19 +312,30 @@ class AnalyticsView extends StatelessWidget {
                         style: TextStyle(
                           fontSize: _kDialogTitle,
                           fontWeight: FontWeight.bold,
-                          color: context.chrome.navBlue,
+                          color: scheme.primary,
                         ),
                       ),
                       const SizedBox(height: 14),
                       Theme(
                         data: Theme.of(ctx).copyWith(
                           datePickerTheme: DatePickerThemeData(
+                            backgroundColor: scheme.surfaceContainerHigh,
+                            headerForegroundColor: scheme.onSurface,
+                            weekdayStyle: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
                             dayForegroundColor:
-                                WidgetStatePropertyAll(context.chrome.navBlue),
+                                WidgetStateProperty.resolveWith((states) {
+                              if (states.contains(WidgetState.selected)) {
+                                return scheme.onPrimary;
+                              }
+                              return scheme.onSurface;
+                            }),
                             dayBackgroundColor: WidgetStateProperty.resolveWith(
                                 (Set<WidgetState> states) {
                               if (states.contains(WidgetState.selected)) {
-                                return context.chrome.segmentSelectedFill;
+                                return scheme.primary;
                               }
                               return null;
                             }),
@@ -313,7 +347,7 @@ class AnalyticsView extends StatelessWidget {
                                   borderRadius:
                                       const BorderRadius.all(Radius.circular(8)),
                                   side: BorderSide(
-                                      color: context.chrome.segmentBorder, width: 2),
+                                      color: scheme.primary, width: 2),
                                 );
                               }
                               return const RoundedRectangleBorder(
@@ -322,11 +356,12 @@ class AnalyticsView extends StatelessWidget {
                               );
                             }),
                             todayForegroundColor:
-                                WidgetStatePropertyAll(context.chrome.navBlue),
-                            todayBackgroundColor:
-                                WidgetStatePropertyAll(context.chrome.segmentSelectedFill),
+                                WidgetStatePropertyAll(scheme.primary),
+                            todayBackgroundColor: WidgetStatePropertyAll(
+                              scheme.primary.withValues(alpha: 0.14),
+                            ),
                             todayBorder: BorderSide(
-                                color: context.chrome.navBlue, width: 1.5),
+                                color: scheme.primary, width: 1.5),
                           ),
                         ),
                         child: SizedBox(
@@ -351,8 +386,11 @@ class AnalyticsView extends StatelessWidget {
                             child: OutlinedButton(
                               onPressed: () => Navigator.of(ctx).pop(),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: context.chrome.navBlue,
-                                side: BorderSide(color: context.chrome.segmentBorder, width: 1.5),
+                                foregroundColor: scheme.onSurface,
+                                side: BorderSide(
+                                  color: scheme.outline.withValues(alpha: 0.65),
+                                  width: 1.5,
+                                ),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
@@ -372,8 +410,8 @@ class AnalyticsView extends StatelessWidget {
                                 vm.goToCurrentWeek();
                               },
                               style: FilledButton.styleFrom(
-                                backgroundColor: context.chrome.navBlue,
-                                foregroundColor: Colors.white,
+                                backgroundColor: scheme.primary,
+                                foregroundColor: scheme.onPrimary,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
@@ -456,17 +494,7 @@ class AnalyticsView extends StatelessWidget {
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: _analyticsCardDecoration(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -833,17 +861,7 @@ class _ProductivityTabState extends State<_ProductivityTab> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: _analyticsCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -977,17 +995,7 @@ class _FocusTimerTabState extends State<_FocusTimerTab> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: _analyticsCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

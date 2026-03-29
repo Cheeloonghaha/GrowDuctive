@@ -695,15 +695,15 @@ class _CalendarViewState extends State<CalendarView> {
                               title: 'Overdue tasks',
                               subtitle:
                                   unscheduledTasks
-                                      .where((t) => t.overdue)
+                                      .where((t) => TaskViewModel.computeShouldBeOverdue(t))
                                       .isEmpty
                                   ? 'None'
-                                  : '${unscheduledTasks.where((t) => t.overdue).length} task${unscheduledTasks.where((t) => t.overdue).length == 1 ? '' : 's'}',
+                                  : '${unscheduledTasks.where((t) => TaskViewModel.computeShouldBeOverdue(t)).length} task${unscheduledTasks.where((t) => TaskViewModel.computeShouldBeOverdue(t)).length == 1 ? '' : 's'}',
                               icon: Icons.warning_amber_rounded,
                               headerColor: Colors.red.shade600,
                               child: () {
                                 final overdue = unscheduledTasks
-                                    .where((t) => t.overdue)
+                                    .where((t) => TaskViewModel.computeShouldBeOverdue(t))
                                     .toList();
                                 if (overdue.isEmpty) {
                                   return Padding(
@@ -732,7 +732,7 @@ class _CalendarViewState extends State<CalendarView> {
                                           _taskPickCheckboxRow(
                                             title: task.title,
                                             subtitle:
-                                                'From ${task.createdAt.day}/${task.createdAt.month}/${task.createdAt.year}',
+                                                'Due ${_formatHeaderDate(task.taskDate)}',
                                             durationMinutes: task.duration,
                                             importance: task.importance,
                                             urgency: task.urgency,
@@ -768,15 +768,15 @@ class _CalendarViewState extends State<CalendarView> {
                                   'Tasks for ${_formatHeaderDate(_selectedDate)}',
                               subtitle:
                                   unscheduledTasks
-                                      .where((t) => !t.overdue)
+                                      .where((t) => !TaskViewModel.computeShouldBeOverdue(t))
                                       .isEmpty
                                   ? 'None'
-                                  : '${unscheduledTasks.where((t) => !t.overdue).length} task${unscheduledTasks.where((t) => !t.overdue).length == 1 ? '' : 's'}',
+                                  : '${unscheduledTasks.where((t) => !TaskViewModel.computeShouldBeOverdue(t)).length} task${unscheduledTasks.where((t) => !TaskViewModel.computeShouldBeOverdue(t)).length == 1 ? '' : 's'}',
                               icon: Icons.event_available_rounded,
                               headerColor: Colors.black,
                               child: () {
                                 final todays = unscheduledTasks
-                                    .where((t) => !t.overdue)
+                                    .where((t) => !TaskViewModel.computeShouldBeOverdue(t))
                                     .toList();
                                 if (todays.isEmpty) {
                                   return Padding(
@@ -1155,14 +1155,20 @@ class _CalendarViewState extends State<CalendarView> {
                       width: 48,
                       child: Text(
                         '${hour.toString().padLeft(2, '0')}:00',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                     Expanded(
                       child: Container(
                         margin: const EdgeInsets.only(top: 0),
                         height: 1,
-                        color: Colors.grey[200],
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withValues(alpha: 0.22),
                       ),
                     ),
                   ],
@@ -1198,8 +1204,8 @@ class _CalendarViewState extends State<CalendarView> {
         continue;
       }
 
-      // Only consider tasks for the currently selected date
-      if (!_isSameDay(task.createdAt, _selectedDate)) continue;
+      // Only consider tasks for the currently selected date (logical task day).
+      if (!_isSameDay(task.taskDate, _selectedDate)) continue;
 
       final removedKey =
           '${task.id}|${_selectedDate.year}_${_selectedDate.month}_${_selectedDate.day}';
@@ -1256,6 +1262,10 @@ class _CalendarViewState extends State<CalendarView> {
     ScheduledTaskViewModel scheduledVM,
     TaskViewModel taskVM,
   ) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    // Low-contrast stroke + slight fill in dark mode — avoids bright grey[300] grid lines.
+    final borderColor = scheme.outline.withValues(alpha: isDark ? 0.14 : 0.28);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1264,7 +1274,10 @@ class _CalendarViewState extends State<CalendarView> {
         borderRadius: BorderRadius.circular(6),
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
+            color: isDark
+                ? scheme.surfaceContainerHighest.withValues(alpha: 0.35)
+                : null,
+            border: Border.all(color: borderColor),
             borderRadius: BorderRadius.circular(6),
           ),
         ),
@@ -1291,6 +1304,10 @@ class _CalendarViewState extends State<CalendarView> {
     required double cardHeight,
   }) {
     final statusColor = _scheduledTaskStatusColor(st, task);
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final titleTextColor = isDark ? scheme.onSurface : Colors.black87;
+    final timeTextColor = isDark ? scheme.onSurfaceVariant : Colors.grey[600]!;
     // One-hour blocks (~58px tall) need tight line metrics; default text heights overflow ~3px.
     final compactCard = cardHeight <= 66;
     return GestureDetector(
@@ -1391,7 +1408,7 @@ class _CalendarViewState extends State<CalendarView> {
           vertical: isShortTask ? 2 : (compactCard ? 4 : 6),
         ),
         decoration: BoxDecoration(
-          color: statusColor.withOpacity(0.2),
+          color: statusColor.withValues(alpha: isDark ? 0.32 : 0.2),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: statusColor, width: 2),
         ),
@@ -1417,10 +1434,10 @@ class _CalendarViewState extends State<CalendarView> {
                             const SizedBox(width: 4),
                             Text(
                               title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 11,
-                                color: Colors.black87,
+                                color: titleTextColor,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1449,7 +1466,7 @@ class _CalendarViewState extends State<CalendarView> {
                                   fontWeight: FontWeight.w600,
                                   fontSize: compactCard ? 11 : 12,
                                   height: 1.0,
-                                  color: Colors.black87,
+                                  color: titleTextColor,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1463,7 +1480,7 @@ class _CalendarViewState extends State<CalendarView> {
                           style: TextStyle(
                             fontSize: compactCard ? 9 : 10,
                             height: 1.0,
-                            color: Colors.grey[600],
+                            color: timeTextColor,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1983,11 +2000,12 @@ class _CalendarViewState extends State<CalendarView> {
             builder: (context, scheduledSnapshot) {
               final scheduled = scheduledSnapshot.data ?? [];
               final scheduledTaskIds = scheduled.map((s) => s.taskId).toSet();
+              // Use logical overdue (taskDate vs today), not only the stored flag — same as TaskViewModel.tasksStream.
               final overdue = tasks
                   .where(
                     (t) =>
                         !t.isCompleted &&
-                        (t.overdue) &&
+                        TaskViewModel.computeShouldBeOverdue(t) &&
                         !scheduledTaskIds.contains(t.id),
                   )
                   .toList();
@@ -1995,8 +2013,8 @@ class _CalendarViewState extends State<CalendarView> {
                   .where(
                     (t) =>
                         !t.isCompleted &&
-                        !t.overdue &&
-                        _isSameDay(t.createdAt, _selectedDate) &&
+                        !TaskViewModel.computeShouldBeOverdue(t) &&
+                        _isSameDay(t.taskDate, _selectedDate) &&
                         !scheduledTaskIds.contains(t.id),
                   )
                   .toList();
@@ -2009,8 +2027,8 @@ class _CalendarViewState extends State<CalendarView> {
                     children: [
                       Text(
                         'No tasks to schedule. '
-                        'Add tasks for ${_formatHeaderDate(_selectedDate)} (use + button above) '
-                        'or complete any overdue tasks.',
+                        'Add tasks for ${_formatHeaderDate(_selectedDate)} (use + button above), '
+                        'or schedule overdue tasks from the list above.',
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -2065,7 +2083,7 @@ class _CalendarViewState extends State<CalendarView> {
                                         _taskPickRow(
                                           title: task.title,
                                           subtitle:
-                                              'From ${task.createdAt.day}/${task.createdAt.month}/${task.createdAt.year}',
+                                              'Due ${_formatHeaderDate(task.taskDate)}',
                                           durationMinutes: task.duration,
                                           startMinutes: startMinutes,
                                           endMinutes: endMinutes,
@@ -2624,8 +2642,10 @@ class _CalendarViewState extends State<CalendarView> {
   Future<Set<String>?> _showFullDayTaskSelectionSheet({
     required List<TaskModel> candidates,
   }) async {
-    final overdue = candidates.where((t) => t.overdue).toList();
-    final todays = candidates.where((t) => !t.overdue).toList();
+    final overdue =
+        candidates.where((t) => TaskViewModel.computeShouldBeOverdue(t)).toList();
+    final todays =
+        candidates.where((t) => !TaskViewModel.computeShouldBeOverdue(t)).toList();
     final selectedTaskIds = <String>{for (final t in candidates) t.id};
 
     return showModalBottomSheet<Set<String>>(
@@ -2748,7 +2768,7 @@ class _CalendarViewState extends State<CalendarView> {
                                               _taskPickCheckboxRow(
                                                 title: task.title,
                                                 subtitle:
-                                                    'From ${task.createdAt.day}/${task.createdAt.month}/${task.createdAt.year}',
+                                                    'Due ${_formatHeaderDate(task.taskDate)}',
                                                 durationMinutes: task.duration,
                                                 importance: task.importance,
                                                 urgency: task.urgency,
@@ -2934,6 +2954,7 @@ class _CalendarViewState extends State<CalendarView> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -2944,6 +2965,7 @@ class _CalendarViewState extends State<CalendarView> {
               future: prefsFuture,
               builder: (context, prefsSnap) {
                 final prefs = prefsSnap.data;
+                final scheme = Theme.of(context).colorScheme;
 
                 if (!didInitReminderState &&
                     prefsSnap.connectionState != ConnectionState.waiting) {
@@ -3042,7 +3064,7 @@ class _CalendarViewState extends State<CalendarView> {
                           height: 4,
                           margin: const EdgeInsets.only(top: 12, bottom: 8),
                           decoration: BoxDecoration(
-                            color: Colors.grey[300],
+                            color: scheme.outline.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -3053,23 +3075,23 @@ class _CalendarViewState extends State<CalendarView> {
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: scheme.onSurface.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.event_note,
-                                  color: Colors.black87,
+                                  color: scheme.onSurface,
                                   size: 24,
                                 ),
                               ),
                               const SizedBox(width: 14),
-                              const Expanded(
+                              Expanded(
                                 child: Text(
                                   'Scheduled task',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -3086,10 +3108,10 @@ class _CalendarViewState extends State<CalendarView> {
                               children: [
                                 Text(
                                   title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -3159,24 +3181,34 @@ class _CalendarViewState extends State<CalendarView> {
                                   st.status,
                                 ),
                                 const SizedBox(height: 24),
-                                const Divider(height: 1),
+                                Divider(height: 1, color: scheme.outline.withValues(alpha: 0.28)),
                                 const SizedBox(height: 16),
-                                const Text(
+                                Text(
                                   'Reminders',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.black87,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 10),
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('Remind me'),
+                                  title: Text(
+                                    'Remind me',
+                                    style: TextStyle(
+                                      color: scheme.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   subtitle: Text(
                                     remindersEnabledState
                                         ? 'Notifications will be scheduled for this task'
                                         : 'No reminders for this scheduled task',
+                                    style: TextStyle(
+                                      color: scheme.onSurfaceVariant,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   value: remindersEnabledState,
                                   onChanged: (v) => setSheetState(() {
@@ -3189,7 +3221,7 @@ class _CalendarViewState extends State<CalendarView> {
                                     'Minutes before start',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey[700],
+                                      color: scheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -3262,10 +3294,6 @@ class _CalendarViewState extends State<CalendarView> {
                                     alignment: Alignment.centerRight,
                                     child: FilledButton(
                                       onPressed: saveReminderSettings,
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: Colors.black,
-                                        foregroundColor: Colors.white,
-                                      ),
                                       child: const Text('Save reminders'),
                                     ),
                                   ),
@@ -3276,13 +3304,20 @@ class _CalendarViewState extends State<CalendarView> {
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
                                         color: reminderSaveError
-                                            ? Colors.red.shade50
-                                            : Colors.green.shade50,
+                                            ? scheme.errorContainer
+                                            : (scheme.brightness == Brightness.dark
+                                                ? Color.alphaBlend(
+                                                    Colors.green.withValues(alpha: 0.28),
+                                                    scheme.surfaceContainerHighest,
+                                                  )
+                                                : Colors.green.shade50),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: reminderSaveError
-                                              ? Colors.red.shade200
-                                              : Colors.green.shade200,
+                                              ? scheme.error.withValues(alpha: 0.65)
+                                              : (scheme.brightness == Brightness.dark
+                                                  ? Colors.green.withValues(alpha: 0.5)
+                                                  : Colors.green.shade200),
                                         ),
                                       ),
                                       child: Row(
@@ -3295,8 +3330,11 @@ class _CalendarViewState extends State<CalendarView> {
                                                 : Icons.check_circle_outline,
                                             size: 18,
                                             color: reminderSaveError
-                                                ? Colors.red.shade700
-                                                : Colors.green.shade700,
+                                                ? scheme.onErrorContainer
+                                                : (scheme.brightness ==
+                                                        Brightness.dark
+                                                    ? Colors.lightGreenAccent
+                                                    : Colors.green.shade700),
                                           ),
                                           const SizedBox(width: 8),
                                           Expanded(
@@ -3305,8 +3343,11 @@ class _CalendarViewState extends State<CalendarView> {
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: reminderSaveError
-                                                    ? Colors.red.shade800
-                                                    : Colors.green.shade800,
+                                                    ? scheme.onErrorContainer
+                                                    : (scheme.brightness ==
+                                                            Brightness.dark
+                                                        ? scheme.onSurface
+                                                        : Colors.green.shade800),
                                               ),
                                             ),
                                           ),
@@ -3316,7 +3357,7 @@ class _CalendarViewState extends State<CalendarView> {
                                   ],
                                 ],
                                 const SizedBox(height: 24),
-                                const Divider(height: 1),
+                                Divider(height: 1, color: scheme.outline.withValues(alpha: 0.28)),
                                 const SizedBox(height: 16),
                                 Material(
                                   color: Colors.transparent,
@@ -3439,10 +3480,11 @@ class _CalendarViewState extends State<CalendarView> {
   }
 
   Widget _detailRow(IconData icon, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: Colors.grey[600]),
+        Icon(icon, size: 20, color: scheme.onSurfaceVariant),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -3452,17 +3494,17 @@ class _CalendarViewState extends State<CalendarView> {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: scheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w500,
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

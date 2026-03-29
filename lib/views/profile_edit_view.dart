@@ -140,8 +140,8 @@ class _ProfileEditViewState extends State<ProfileEditView> {
                   ElevatedButton(
                     onPressed: _isLoading ? null : () => _save(authVM),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -183,21 +183,33 @@ class _ProfileEditViewState extends State<ProfileEditView> {
     int maxLines = 1,
     String? Function(String?)? validator,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final borderRadius = BorderRadius.circular(12);
+    final borderColor = scheme.outline.withValues(alpha: 0.65);
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      style: TextStyle(color: scheme.onSurface),
+      cursorColor: scheme.primary,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+        floatingLabelStyle: TextStyle(color: scheme.primary),
+        hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.85)),
+        prefixIcon: Icon(icon, color: scheme.onSurfaceVariant),
+        border: OutlineInputBorder(borderRadius: borderRadius),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: borderRadius,
+          borderSide: BorderSide(color: borderColor),
+        ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.black, width: 2),
+          borderRadius: borderRadius,
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: scheme.surfaceContainerHighest,
       ),
       validator: validator,
     );

@@ -64,7 +64,7 @@ class GrowductiveApp extends StatelessWidget {
     return StreamBuilder<UserPreferencesModel?>(
       stream: prefsVM.preferencesStream,
       builder: (context, snapshot) {
-        final themeStr = snapshot.data?.theme ?? 'system';
+        final themeStr = prefsVM.themeResolved(snapshot.data?.theme);
         final ThemeMode mode;
         if (themeStr == 'dark') {
           mode = ThemeMode.dark;
@@ -78,6 +78,8 @@ class GrowductiveApp extends StatelessWidget {
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),
           themeMode: mode,
+          themeAnimationDuration: const Duration(milliseconds: 260),
+          themeAnimationCurve: Curves.easeInOutCubic,
           home: const AuthWrapper(),
           debugShowCheckedModeBanner: false,
           builder: (context, child) {

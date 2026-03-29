@@ -157,36 +157,49 @@ class ProfileView extends StatelessWidget {
                       left: 16,
                       right: 16,
                       bottom: 12,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            fadeSlideRoute(const ProfileEditView()),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(color: Colors.grey[400]!),
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.edit_outlined, size: 20, color: Colors.black87),
-                            SizedBox(width: 8),
-                            Text(
-                              'Edit profile',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                      child: Builder(
+                        builder: (ctx) {
+                          final scheme = Theme.of(ctx).colorScheme;
+                          final isDark = scheme.brightness == Brightness.dark;
+                          final fg = scheme.onSurface;
+                          return OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                fadeSlideRoute(const ProfileEditView()),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              side: BorderSide(
+                                color: isDark
+                                    ? scheme.outline.withValues(alpha: 0.55)
+                                    : Colors.grey[400]!,
+                              ),
+                              backgroundColor:
+                                  isDark ? scheme.surfaceContainerHigh : Colors.white,
+                              foregroundColor: fg,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.edit_outlined, size: 20, color: fg),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Edit profile',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: fg,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -202,44 +215,59 @@ class ProfileView extends StatelessWidget {
                       children: [
                         const SizedBox(height: 84),
                         const SizedBox(height: 16),
-                        Material(
-                          elevation: 8,
-                          shadowColor: Colors.black.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(28),
-                          color: Colors.white,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                        Builder(
+                          builder: (ctx) {
+                            final scheme = Theme.of(ctx).colorScheme;
+                            final isDark = scheme.brightness == Brightness.dark;
+                            final titleColor = context.chrome.navBlue;
+                            return Material(
+                              elevation: 8,
+                              shadowColor:
+                                  Colors.black.withValues(alpha: isDark ? 0.38 : 0.12),
+                              color: isDark ? scheme.surfaceContainerHigh : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                                side: isDark
+                                    ? BorderSide(
+                                        color: scheme.outline.withValues(alpha: 0.38),
+                                      )
+                                    : BorderSide.none,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: _profileNavyMid,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(Icons.tune_rounded,
-                                          color: Colors.white, size: 20),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: _profileNavyMid,
+                                            borderRadius: BorderRadius.circular(11),
+                                          ),
+                                          child: const Icon(Icons.tune_rounded,
+                                              color: Colors.white, size: 19),
+                                        ),
+                                        const SizedBox(width: 11),
+                                        Text(
+                                          'User preferences',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: titleColor,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 12),
-                                    const Text(
-                                      'User preferences',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: _profileNavyTop,
-                                      ),
-                                    ),
+                                    const SizedBox(height: 14),
+                                    const _ProfilePreferencesForm(embedded: true),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
-                                const _ProfilePreferencesForm(embedded: true),
-                              ],
-                            ),
-                          ),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton(
@@ -285,8 +313,10 @@ class ProfileView extends StatelessWidget {
     // Show confirmation dialog
     final shouldLogout = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        return Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 300),
@@ -296,36 +326,38 @@ class ProfileView extends StatelessWidget {
               // Header
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: scheme.inverseSurface,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     topRight: Radius.circular(16),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.logout, color: Colors.white, size: 24),
+                    Icon(Icons.logout, color: scheme.onInverseSurface, size: 24),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         "Logout",
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: scheme.onInverseSurface,
                         ),
                       ),
                     ),
                     GestureDetector(
-                      onTap: () => Navigator.pop(context, false),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      onTap: () => Navigator.pop(dialogContext, false),
+                      child: Icon(Icons.close, color: scheme.onInverseSurface, size: 24),
                     ),
                   ],
                 ),
               ),
               // Content
-              Padding(
+              Container(
+                width: double.infinity,
+                color: scheme.surfaceContainerHigh,
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
@@ -333,7 +365,7 @@ class ProfileView extends StatelessWidget {
                       "Are you sure you want to logout?",
                       style: TextStyle(
                         fontSize: 15,
-                        color: Colors.grey[800],
+                        color: scheme.onSurface,
                         fontWeight: FontWeight.w500,
                       ),
                       textAlign: TextAlign.center,
@@ -344,28 +376,30 @@ class ProfileView extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         OutlinedButton(
-                          onPressed: () => Navigator.pop(context, false),
+                          onPressed: () => Navigator.pop(dialogContext, false),
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.grey[400]!),
+                            side: BorderSide(
+                              color: scheme.outline.withValues(alpha: 0.65),
+                            ),
+                            foregroundColor: scheme.onSurface,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           ),
-                          child: Text(
+                          child: const Text(
                             "Cancel",
                             style: TextStyle(
-                              color: Colors.grey[700],
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
+                          onPressed: () => Navigator.pop(dialogContext, true),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red[600],
-                            foregroundColor: Colors.white,
+                            backgroundColor: scheme.error,
+                            foregroundColor: scheme.onError,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -386,7 +420,8 @@ class ProfileView extends StatelessWidget {
             ],
           ),
         ),
-      ),
+      );
+      },
     );
 
     if (shouldLogout == true) {
@@ -394,9 +429,11 @@ class ProfileView extends StatelessWidget {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
+        builder: (loadingCtx) => Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(loadingCtx).colorScheme.primary,
+            ),
           ),
         ),
       );
@@ -451,7 +488,7 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
   int? _quietHoursStartMinutes;
   int? _quietHoursEndMinutes;
   int _weekStartsOn = 1; // 1 = Monday, 7 = Sunday
-  String _theme = 'system'; // 'light' | 'dark' | 'system'
+  String _theme = 'light'; // 'light' | 'dark'
   bool _timerSoundEnabled = true;
   bool _timerVibrationEnabled = true;
   bool _loading = true;
@@ -487,7 +524,7 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
         _quietHoursStartController.text = _quietHoursStartMinutes?.toString() ?? '';
         _quietHoursEndController.text = _quietHoursEndMinutes?.toString() ?? '';
         _weekStartsOn = prefs.weekStartsOn;
-        _theme = prefs.theme;
+        _theme = _normalizeThemeChoice(prefs.theme);
         _timerSoundEnabled = prefs.timerSoundEnabled;
         _timerVibrationEnabled = prefs.timerVibrationEnabled;
         _loading = false;
@@ -505,23 +542,76 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
     super.dispose();
   }
 
-  Widget _sectionCard({
+  /// Maps stored values (e.g. legacy `system`) to a valid light/dark choice for the UI.
+  String _normalizeThemeChoice(String theme) =>
+      theme == 'dark' ? 'dark' : 'light';
+
+  InputDecoration _fieldDecoration(
+    BuildContext context, {
+    required String labelText,
+    String? hintText,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final radius = BorderRadius.circular(9);
+    OutlineInputBorder outline(Color color, [double w = 1]) => OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: color, width: w),
+        );
+    return InputDecoration(
+      isDense: true,
+      filled: isDark,
+      fillColor: isDark ? scheme.surfaceContainerHighest : null,
+      labelText: labelText,
+      hintText: hintText,
+      labelStyle: TextStyle(
+        fontSize: 14,
+        color: isDark ? scheme.onSurfaceVariant : Colors.grey.shade800,
+      ),
+      floatingLabelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: scheme.primary,
+      ),
+      hintStyle: TextStyle(
+        fontSize: 13,
+        color: scheme.onSurfaceVariant.withValues(alpha: 0.9),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      enabledBorder: outline(
+        isDark ? scheme.outline.withValues(alpha: 0.5) : Colors.grey.shade400,
+      ),
+      focusedBorder: outline(scheme.primary, 2),
+      border: outline(
+        isDark ? scheme.outline.withValues(alpha: 0.5) : Colors.grey.shade400,
+      ),
+    );
+  }
+
+  Widget _sectionCard(BuildContext context, {
     required IconData icon,
     required String title,
     required List<Widget> children,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final onText = scheme.onSurface;
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 22),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        color: isDark ? scheme.surfaceContainerHighest : Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: isDark
+              ? scheme.outline.withValues(alpha: 0.38)
+              : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -531,30 +621,35 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(10),
+                  color: isDark
+                      ? scheme.surfaceContainerHigh
+                      : Colors.black.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(icon, size: 18, color: Colors.black87),
+                child: Icon(icon, size: 17, color: onText),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black87,
+                    color: onText,
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 9),
+          Divider(
+            height: 1,
+            color: scheme.outline.withValues(alpha: isDark ? 0.35 : 0.2),
+          ),
           const SizedBox(height: 10),
-          Divider(height: 1, color: Colors.grey.shade200),
-          const SizedBox(height: 12),
           ...children,
         ],
       ),
@@ -564,6 +659,9 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
   @override
   Widget build(BuildContext context) {
     final prefsVM = Provider.of<UserPreferencesViewModel>(context, listen: false);
+    final scheme = Theme.of(context).colorScheme;
+    final fieldStyle = TextStyle(fontSize: 14, color: scheme.onSurface);
+    final subStyle = TextStyle(fontSize: 12, color: scheme.onSurfaceVariant);
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -572,26 +670,33 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
             _loading
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: CircularProgressIndicator(),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      child: SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.primary,
+                        ),
+                      ),
                     ),
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _sectionCard(
+                      _sectionCard(context,
                         icon: Icons.auto_awesome,
                         title: 'Smart Task Organizer',
                         children: [
                           TextField(
                             controller: _breakDurationController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            style: fieldStyle,
+                            decoration: _fieldDecoration(context,
                               labelText: 'Break duration (minutes)',
                               hintText: 'e.g. 10',
-                              border: OutlineInputBorder(),
                             ),
                             onChanged: (value) {
                               final parsed = int.tryParse(value);
@@ -600,14 +705,14 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                               }
                             },
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           TextField(
                             controller: _breakAfterController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            style: fieldStyle,
+                            decoration: _fieldDecoration(context,
                               labelText: 'Insert a break after (minutes of tasks)',
                               hintText: 'Leave empty for every task',
-                              border: OutlineInputBorder(),
                             ),
                             onChanged: (value) {
                               if (value.trim().isEmpty) {
@@ -622,14 +727,25 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                           ),
                         ],
                       ),
-                      _sectionCard(
+                      _sectionCard(context,
                         icon: Icons.schedule_outlined,
                         title: 'Reminders & quiet hours',
                         children: [
                           SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Task reminders'),
-                            subtitle: const Text('Enable reminders for upcoming tasks'),
+                            visualDensity: VisualDensity.standard,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                            title: Text(
+                              'Task reminders',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Enable reminders for upcoming tasks',
+                              style: subStyle,
+                            ),
                             value: _remindersEnabled,
                             onChanged: (v) => setState(() => _remindersEnabled = v),
                           ),
@@ -637,10 +753,10 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                           TextField(
                             controller: _defaultReminderController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            style: fieldStyle,
+                            decoration: _fieldDecoration(context,
                               labelText: 'Default reminder (minutes before)',
                               hintText: 'e.g. 15',
-                              border: OutlineInputBorder(),
                             ),
                             onChanged: (v) {
                               final parsed = int.tryParse(v);
@@ -649,17 +765,17 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                               }
                             },
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Row(
                             children: [
                               Expanded(
                                 child: TextField(
                                   controller: _quietHoursStartController,
                                   keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
+                                  style: fieldStyle,
+                                  decoration: _fieldDecoration(context,
                                     labelText: 'Quiet hours start',
                                     hintText: 'Optional (minutes)',
-                                    border: OutlineInputBorder(),
                                   ),
                                   onChanged: (v) {
                                     if (v.trim().isEmpty) {
@@ -673,15 +789,15 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
                                   controller: _quietHoursEndController,
                                   keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
+                                  style: fieldStyle,
+                                  decoration: _fieldDecoration(context,
                                     labelText: 'Quiet hours end',
                                     hintText: 'Optional (minutes)',
-                                    border: OutlineInputBorder(),
                                   ),
                                   onChanged: (v) {
                                     if (v.trim().isEmpty) {
@@ -699,19 +815,25 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                           ),
                         ],
                       ),
-                      _sectionCard(
+                      _sectionCard(context,
                         icon: Icons.calendar_month_outlined,
                         title: 'Calendar',
                         children: [
                           DropdownButtonFormField<int>(
                             value: _weekStartsOn,
-                            decoration: const InputDecoration(
+                            style: fieldStyle,
+                            decoration: _fieldDecoration(context,
                               labelText: 'Week starts on',
-                              border: OutlineInputBorder(),
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 1, child: Text('Monday')),
-                              DropdownMenuItem(value: 7, child: Text('Sunday')),
+                            items: [
+                              DropdownMenuItem(
+                                value: 1,
+                                child: Text('Monday', style: fieldStyle),
+                              ),
+                              DropdownMenuItem(
+                                value: 7,
+                                child: Text('Sunday', style: fieldStyle),
+                              ),
                             ],
                             onChanged: (v) {
                               if (v == null) return;
@@ -720,46 +842,73 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                           ),
                         ],
                       ),
-                      _sectionCard(
+                      _sectionCard(context,
                         icon: Icons.palette_outlined,
                         title: 'Appearance',
                         children: [
                           DropdownButtonFormField<String>(
                             value: _theme,
-                            decoration: const InputDecoration(
+                            style: fieldStyle,
+                            decoration: _fieldDecoration(context,
                               labelText: 'Theme',
-                              border: OutlineInputBorder(),
                             ),
-                            items: const [
+                            items: [
                               DropdownMenuItem(
-                                value: 'system',
-                                child: Text('System default'),
+                                value: 'light',
+                                child: Text('Light', style: fieldStyle),
                               ),
-                              DropdownMenuItem(value: 'light', child: Text('Light')),
-                              DropdownMenuItem(value: 'dark', child: Text('Dark')),
+                              DropdownMenuItem(
+                                value: 'dark',
+                                child: Text('Dark', style: fieldStyle),
+                              ),
                             ],
                             onChanged: (v) {
                               if (v == null) return;
                               setState(() => _theme = v);
+                              prefsVM.updateTheme(v).catchError((Object e, StackTrace st) {
+                                debugPrint('updateTheme failed: $e');
+                              });
                             },
                           ),
                         ],
                       ),
-                      _sectionCard(
+                      _sectionCard(context,
                         icon: Icons.timer_outlined,
                         title: 'Focus timer',
                         children: [
                           SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Sound'),
-                            subtitle: const Text('Play sound when a session ends'),
+                            visualDensity: VisualDensity.standard,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                            title: Text(
+                              'Sound',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Play sound when a session ends',
+                              style: subStyle,
+                            ),
                             value: _timerSoundEnabled,
                             onChanged: (v) => setState(() => _timerSoundEnabled = v),
                           ),
                           SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Vibration'),
-                            subtitle: const Text('Vibrate when a session ends (mobile only)'),
+                            visualDensity: VisualDensity.standard,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                            title: Text(
+                              'Vibration',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Vibrate when a session ends (mobile only)',
+                              style: subStyle,
+                            ),
                             value: _timerVibrationEnabled,
                             onChanged: (v) => setState(() => _timerVibrationEnabled = v),
                           ),
@@ -771,11 +920,19 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                           if (!widget.embedded) ...[
                             TextButton(
                               onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                textStyle: const TextStyle(fontSize: 14),
+                              ),
                               child: const Text('Cancel'),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                           ],
                           FilledButton(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
                             onPressed: _saving
                                 ? null
                                 : () async {
@@ -828,7 +985,6 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                                         quietHoursEndMinutes: _quietHoursEndMinutes,
                                       );
                                       await prefsVM.updateWeekStartsOn(_weekStartsOn);
-                                      await prefsVM.updateTheme(_theme);
                                       await prefsVM.updateFocusTimerPreferences(
                                         timerSoundEnabled: _timerSoundEnabled,
                                         timerVibrationEnabled: _timerVibrationEnabled,

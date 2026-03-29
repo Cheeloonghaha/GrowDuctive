@@ -48,8 +48,13 @@ class AppSectionHeader extends StatelessWidget {
                 style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
+                      color: theme.colorScheme.onSurface,
                     ) ??
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
               ),
             ),
           ],
