@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/scheduled_task_model.dart';
-import '../models/task_model.dart';
-import '../models/user_preferences_model.dart';
 import '../services/notification_service.dart';
 
 class ScheduledTaskViewModel extends ChangeNotifier {
@@ -150,9 +148,9 @@ class ScheduledTaskViewModel extends ChangeNotifier {
     required String taskTitle,
     required DateTime dateOnly,
     required int startTimeMinutes,
+    required int endTimeMinutes,
     required List<int> reminderOffsetsMinutes,
     required bool? remindersEnabled,
-    required UserPreferencesModel? prefs,
   }) async {
     try {
       await NotificationService.instance.scheduleTaskReminders(
@@ -160,8 +158,8 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         taskTitle: taskTitle,
         scheduleDateOnly: dateOnly,
         startTimeMinutes: startTimeMinutes,
+        endTimeMinutes: endTimeMinutes,
         offsetsMinutes: reminderOffsetsMinutes,
-        prefs: prefs,
         remindersEnabledOverride: remindersEnabled,
       );
     } catch (e) {
@@ -172,13 +170,11 @@ class ScheduledTaskViewModel extends ChangeNotifier {
   Future<void> _cancelRemindersForDoc({
     required String scheduledTaskDocId,
     required List<int> reminderOffsetsMinutes,
-    required UserPreferencesModel? prefs,
   }) async {
     try {
       await NotificationService.instance.cancelTaskReminders(
         scheduledTaskId: scheduledTaskDocId,
         offsetsMinutes: reminderOffsetsMinutes,
-        prefs: prefs,
       );
     } catch (e) {
       debugPrint('ScheduledTaskViewModel: cancel reminders failed: $e');
@@ -195,7 +191,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
     String taskName = '',
     List<int>? reminderOffsetsMinutes,
     bool? remindersEnabled,
-    UserPreferencesModel? prefs,
   }) async {
     await _createScheduledTaskIfMissing(
       taskId: taskId,
@@ -205,7 +200,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
       taskName: taskName,
       reminderOffsetsMinutes: reminderOffsetsMinutes,
       remindersEnabled: remindersEnabled,
-      prefs: prefs,
     );
   }
 
@@ -220,7 +214,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
     String taskName = '',
     List<int>? reminderOffsetsMinutes,
     bool? remindersEnabled,
-    UserPreferencesModel? prefs,
   }) async {
     final existing = await _db
         .collection('scheduled_tasks')
@@ -263,7 +256,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
       await _cancelRemindersForDoc(
         scheduledTaskDocId: primaryDoc.id,
         reminderOffsetsMinutes: primarySt.reminderOffsetsMinutes,
-        prefs: prefs,
       );
 
       await _scheduleRemindersForDoc(
@@ -271,10 +263,10 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         taskTitle: taskName.isNotEmpty ? taskName : primarySt.taskName,
         dateOnly: dateOnly,
         startTimeMinutes: startTimeMinutes,
+        endTimeMinutes: endTimeMinutes,
         reminderOffsetsMinutes:
             reminderOffsetsMinutes ?? primarySt.reminderOffsetsMinutes,
         remindersEnabled: remindersEnabled ?? primarySt.remindersEnabled,
-        prefs: prefs,
       );
 
       for (var i = 1; i < matchingDocs.length; i++) {
@@ -283,7 +275,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         await _cancelRemindersForDoc(
           scheduledTaskDocId: doc.id,
           reminderOffsetsMinutes: st.reminderOffsetsMinutes,
-          prefs: prefs,
         );
         await doc.reference.delete();
       }
@@ -314,9 +305,9 @@ class ScheduledTaskViewModel extends ChangeNotifier {
       taskTitle: taskName,
       dateOnly: dateOnly,
       startTimeMinutes: startTimeMinutes,
+      endTimeMinutes: endTimeMinutes,
       reminderOffsetsMinutes: reminderOffsetsMinutes ?? const [],
       remindersEnabled: remindersEnabled,
-      prefs: prefs,
     );
   }
 
@@ -346,7 +337,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
     String taskStatus = 'pending',
     List<int>? reminderOffsetsMinutes,
     bool? remindersEnabled,
-    UserPreferencesModel? prefs,
   }) async {
     try {
       final dateOnly = DateTime(scheduleDate.year, scheduleDate.month, scheduleDate.day);
@@ -372,9 +362,9 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         taskTitle: taskName,
         dateOnly: dateOnly,
         startTimeMinutes: startTimeMinutes,
+        endTimeMinutes: endTimeMinutes,
         reminderOffsetsMinutes: reminderOffsetsMinutes ?? const [],
         remindersEnabled: remindersEnabled,
-        prefs: prefs,
       );
     } catch (e) {
       debugPrint("Error adding scheduled task: $e");
@@ -390,7 +380,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
     required int endTimeMinutes,
     List<int>? reminderOffsetsMinutes,
     bool? remindersEnabled,
-    UserPreferencesModel? prefs,
   }) async {
     try {
       final stDoc = await _db.collection('scheduled_tasks').doc(id).get();
@@ -418,17 +407,16 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         await _cancelRemindersForDoc(
           scheduledTaskDocId: id,
           reminderOffsetsMinutes: existing.reminderOffsetsMinutes,
-          prefs: prefs,
         );
         await _scheduleRemindersForDoc(
           scheduledTaskDocId: id,
           taskTitle: existing.taskName,
           dateOnly: dateOnly,
           startTimeMinutes: startTimeMinutes,
+          endTimeMinutes: endTimeMinutes,
           reminderOffsetsMinutes:
               reminderOffsetsMinutes ?? existing.reminderOffsetsMinutes,
           remindersEnabled: remindersEnabled ?? existing.remindersEnabled,
-          prefs: prefs,
         );
       }
     } catch (e) {
@@ -445,7 +433,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
     required int endTimeMinutes,
     DateTime? scheduleDate,
     String taskName = '',
-    UserPreferencesModel? prefs,
   }) async {
     try {
       final snapshot = await _db
@@ -483,7 +470,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
           await _cancelRemindersForDoc(
             scheduledTaskDocId: id,
             reminderOffsetsMinutes: st.reminderOffsetsMinutes,
-            prefs: prefs,
           );
           await _db.collection('scheduled_tasks').doc(id).delete();
         }
@@ -522,7 +508,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
           await _cancelRemindersForDoc(
             scheduledTaskDocId: doc.id,
             reminderOffsetsMinutes: st.reminderOffsetsMinutes,
-            prefs: prefs,
           );
           await doc.reference.update(updateData);
 
@@ -538,9 +523,9 @@ class ScheduledTaskViewModel extends ChangeNotifier {
             taskTitle: taskName.isNotEmpty ? taskName : st.taskName,
             dateOnly: dateForReminders,
             startTimeMinutes: startTimeMinutes,
+            endTimeMinutes: endTimeMinutes,
             reminderOffsetsMinutes: st.reminderOffsetsMinutes,
             remindersEnabled: st.remindersEnabled,
-            prefs: prefs,
           );
         }
 
@@ -553,7 +538,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
             startTimeMinutes: startTimeMinutes,
             endTimeMinutes: endTimeMinutes,
             taskName: taskName,
-            prefs: prefs,
           );
         }
       } else if (dateOnly != null) {
@@ -563,7 +547,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
           startTimeMinutes: startTimeMinutes,
           endTimeMinutes: endTimeMinutes,
           taskName: taskName,
-          prefs: prefs,
         );
       }
     } catch (e) {
@@ -582,7 +565,7 @@ class ScheduledTaskViewModel extends ChangeNotifier {
   }
 
   /// Delete all scheduled_tasks for the given task (e.g. when task is unscheduled: start/end time cleared).
-  Future<void> deleteAllScheduledTasksForTask(String taskId, {UserPreferencesModel? prefs}) async {
+  Future<void> deleteAllScheduledTasksForTask(String taskId) async {
     try {
       final snapshot = await _db
           .collection('scheduled_tasks')
@@ -594,7 +577,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         await _cancelRemindersForDoc(
           scheduledTaskDocId: doc.id,
           reminderOffsetsMinutes: st.reminderOffsetsMinutes,
-          prefs: prefs,
         );
         await doc.reference.delete();
       }
@@ -605,7 +587,7 @@ class ScheduledTaskViewModel extends ChangeNotifier {
   }
 
   /// Delete a scheduled task. If no other scheduled instances remain for that task, clears the task's start_time/end_time.
-  Future<void> deleteScheduledTask(String id, {UserPreferencesModel? prefs}) async {
+  Future<void> deleteScheduledTask(String id) async {
     try {
       final stDoc = await _db.collection('scheduled_tasks').doc(id).get();
       final taskId = stDoc.data()?['task_id'] as String?;
@@ -614,7 +596,6 @@ class ScheduledTaskViewModel extends ChangeNotifier {
         await _cancelRemindersForDoc(
           scheduledTaskDocId: id,
           reminderOffsetsMinutes: st.reminderOffsetsMinutes,
-          prefs: prefs,
         );
       }
       await _db.collection('scheduled_tasks').doc(id).delete();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/smart_schedule_service.dart';
+import '../theme/growductive_chrome.dart';
 import '../viewmodels/scheduled_task_viewmodel.dart';
 import '../viewmodels/task_viewmodel.dart';
 
@@ -95,40 +96,55 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
   Widget build(BuildContext context) {
     final result = widget.result;
     final slots = result.slots;
+    final scheme = Theme.of(context).colorScheme;
+    final chrome = context.chrome;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: chrome.headerBar,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
+                ),
+                border: Border(
+                  bottom: BorderSide(
+                    color: chrome.segmentBorder.withValues(alpha: 0.55),
+                  ),
                 ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.schedule, color: Colors.white, size: 24),
+                  Icon(Icons.schedule, color: chrome.navBlue, size: 24),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Generated Schedule',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: chrome.navBlue,
                       ),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: const Icon(Icons.close, color: Colors.white, size: 24),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close, color: chrome.navBlue, size: 24),
                   ),
                 ],
               ),
@@ -143,20 +159,23 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
+                          color: scheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange.shade200),
+                          border: Border.all(
+                            color: scheme.outline.withValues(alpha: 0.45),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: Colors.orange.shade800, size: 20),
+                            Icon(Icons.info_outline, color: chrome.navBlue, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 result.overflowMessage!,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.orange.shade900,
+                                  color: scheme.onSurface,
+                                  height: 1.35,
                                 ),
                               ),
                             ),
@@ -166,12 +185,12 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                       const SizedBox(height: 16),
                     ],
                     if (slots.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Center(
                           child: Text(
                             'No slots to show.',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
                         ),
                       )
@@ -179,6 +198,11 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                       ...slots.map((slot) {
                         final timeStr =
                             '${_minutesToTime(slot.startMinutes)} – ${_minutesToTime(slot.endMinutes)}';
+                        final timeColor =
+                            slot.isBreak ? scheme.onSurfaceVariant : scheme.onSurface;
+                        final titleColor = slot.isBreak
+                            ? scheme.onSurfaceVariant
+                            : scheme.onSurface;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Row(
@@ -190,8 +214,8 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                                   timeStr,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: slot.isBreak ? Colors.grey.shade600 : Colors.black87,
+                                    fontWeight: FontWeight.w600,
+                                    color: timeColor,
                                   ),
                                 ),
                               ),
@@ -201,8 +225,10 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                                   slot.taskTitle,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: slot.isBreak ? Colors.grey : Colors.black87,
+                                    color: titleColor,
                                     fontStyle: slot.isBreak ? FontStyle.italic : null,
+                                    fontWeight:
+                                        slot.isBreak ? FontWeight.w500 : FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -214,7 +240,7 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                       const SizedBox(height: 12),
                       Text(
                         _error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                        style: TextStyle(color: scheme.error, fontSize: 13),
                       ),
                     ],
                   ],
@@ -228,7 +254,11 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                 children: [
                   TextButton(
                     onPressed: _isApplying ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    style: TextButton.styleFrom(foregroundColor: chrome.navBlue),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   FilledButton(
@@ -236,8 +266,9 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                         ? null
                         : _onConfirm,
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.black,
+                      backgroundColor: chrome.navBlue,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                     child: _isApplying
                         ? const SizedBox(
@@ -245,7 +276,10 @@ class _SchedulePreviewDialogState extends State<_SchedulePreviewDialog> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Confirm'),
+                        : const Text(
+                            'Confirm',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                   ),
                 ],
               ),

@@ -13,22 +13,25 @@ enum FocusTimerPhase {
   longBreak,
 }
 
-/// Display status for a focus session in the UI.
-/// - [completed] and [interrupted]: show as "Interrupted" (orange).
-/// - [completed] and not [interrupted]: show as "Completed" (green).
-/// - Not [completed]: show as "Incomplete" (grey), even if [interrupted] is true.
+/// Display status for a focus session in the UI (single badge).
+/// - [completed]: "Completed" (green) — success for duration/plan; independent of [interrupted].
+/// - not [completed] and [interrupted]: "Interrupted" (orange).
+/// - neither: "Incomplete" (grey).
+///
+/// [interrupted] in the model is also kept for analytics (e.g. session had a pause) and does not
+/// clear when [completed] is true.
 enum FocusSessionDisplayStatus {
   completed,
   interrupted,
   incomplete,
 }
 
-/// Returns the display status for a session. Use this from the view;
-/// logic: completed+interrupted → interrupted, completed+!interrupted → completed, !completed → incomplete.
+/// Returns the display status for a session. Use this from the view.
+/// [completed] is chosen first so a paused-then-finished session still shows as completed when applicable.
 FocusSessionDisplayStatus getSessionDisplayStatus(FocusSessionModel session) {
-  if (!session.completed) return FocusSessionDisplayStatus.incomplete;
+  if (session.completed) return FocusSessionDisplayStatus.completed;
   if (session.interrupted) return FocusSessionDisplayStatus.interrupted;
-  return FocusSessionDisplayStatus.completed;
+  return FocusSessionDisplayStatus.incomplete;
 }
 
 class FocusTimerViewModel extends ChangeNotifier {
@@ -36,8 +39,9 @@ class FocusTimerViewModel extends ChangeNotifier {
   static const int _defaultShortBreakSeconds = 5 * 60;
   static const int _defaultLongBreakSeconds = 15 * 60;
 
-  /// For testing: session counts as "completed" if duration >= this (seconds).
-  static const int _minCompletedSeconds = 60;
+  /// Interrupted focus (pause/reset) counts as [completed] when elapsed wall time is at least this
+  /// fraction of the planned focus duration for that run ([_plannedDurationSeconds]).
+  static const double _minCompletedFocusFraction = 0.8;
 
   /// After this many completed focus sessions, auto-switch to Long Break instead of Short Break.
   static const int focusCyclesBeforeLongBreak = 4;
@@ -57,9 +61,15 @@ class FocusTimerViewModel extends ChangeNotifier {
   /// Called when focus ends and we've switched to Short/Long Break; show prompt to start or not.
   void Function(FocusTimerPhase breakPhase)? onPromptStartBreak;
 
-  /// When current focus run started (null if not in a run or not focus phase).
-  DateTime? _sessionStartedAt;
-  /// Planned duration for current run (for completed logic: half of this; testing uses _minCompletedSeconds).
+  /// First [start] press for the current focus attempt (persists across pause/resume).
+  DateTime? _focusRunStartedAt;
+  /// Seconds the focus countdown has run while active (sum of all segments; excludes paused time).
+  int _focusActiveSeconds = 0;
+  /// Firestore doc for this focus attempt once first saved; later pauses/completion [update] the same doc.
+  String? _persistedFocusSessionDocId;
+  /// True after any pause in this run; final persist keeps [interrupted] true even when [completed] is true.
+  bool _focusRunHadInterruption = false;
+  /// Planned focus duration for the current run (used with [_minCompletedFocusFraction] when pausing/resetting).
   int _plannedDurationSeconds = _defaultFocusSeconds;
 
   /// Custom timers for current user.
@@ -227,6 +237,9 @@ class FocusTimerViewModel extends ChangeNotifier {
     }
     // When the selected timer is updated (e.g. duration edited), sync current phase duration.
     if (_selectedTimerId != null) {
+      if (_phase == FocusTimerPhase.focus && _focusRunStartedAt != null) {
+        unawaited(_flushFocusSessionInterrupted());
+      }
       final newDuration = _durationForPhase(_phase);
       _remainingSeconds = newDuration;
       if (_phase == FocusTimerPhase.focus) {
@@ -241,6 +254,9 @@ class FocusTimerViewModel extends ChangeNotifier {
   }
 
   void selectTimer(String? timerId) {
+    if (_phase == FocusTimerPhase.focus && _focusRunStartedAt != null) {
+      unawaited(_flushFocusSessionInterrupted());
+    }
     _selectedTimerId = timerId;
     _stopTimer();
     _remainingSeconds = _durationForPhase(_phase);
@@ -288,8 +304,10 @@ class FocusTimerViewModel extends ChangeNotifier {
   }
 
   void selectPhase(FocusTimerPhase phase) {
+    if (_phase == FocusTimerPhase.focus && _focusRunStartedAt != null) {
+      unawaited(_flushFocusSessionInterrupted());
+    }
     _stopTimer();
-    _sessionStartedAt = null;
     _phase = phase;
     _remainingSeconds = _durationForPhase(phase);
     _plannedDurationSeconds = _durationForPhase(phase);
@@ -305,14 +323,20 @@ class FocusTimerViewModel extends ChangeNotifier {
       _plannedDurationSeconds = _remainingSeconds;
     }
 
-    if (_phase == FocusTimerPhase.focus && _sessionStartedAt == null) {
-      _sessionStartedAt = DateTime.now();
+    if (_phase == FocusTimerPhase.focus && _focusRunStartedAt == null) {
+      _focusRunStartedAt = DateTime.now();
+      _focusActiveSeconds = 0;
+      _persistedFocusSessionDocId = null;
+      _focusRunHadInterruption = false;
       _plannedDurationSeconds = _durationForPhase(FocusTimerPhase.focus);
     }
 
     _isRunning = true;
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
+        if (_phase == FocusTimerPhase.focus) {
+          _focusActiveSeconds++;
+        }
         _remainingSeconds--;
         notifyListeners();
       } else {
@@ -324,15 +348,24 @@ class FocusTimerViewModel extends ChangeNotifier {
 
   void _onTimerReachedZero() {
     _stopTimer();
-    if (_phase == FocusTimerPhase.focus && _sessionStartedAt != null) {
-      final startedAt = _sessionStartedAt!;
-      _sessionStartedAt = null;
-      _saveSession(
+    if (_phase == FocusTimerPhase.focus && _focusRunStartedAt != null) {
+      final startedAt = _focusRunStartedAt!;
+      final endedAt = DateTime.now();
+      final durationSec = _focusActiveSeconds;
+      final existingDocId = _persistedFocusSessionDocId;
+      final hadInterruption = _focusRunHadInterruption;
+      _focusRunStartedAt = null;
+      _focusActiveSeconds = 0;
+      _persistedFocusSessionDocId = null;
+      _focusRunHadInterruption = false;
+      unawaited(_persistFocusSession(
         startedAt: startedAt,
-        endedAt: DateTime.now(),
-        interrupted: false,
+        endedAt: endedAt,
+        interrupted: hadInterruption,
         completed: true,
-      );
+        durationSecondsOverride: durationSec,
+        existingFirestoreDocId: existingDocId,
+      ));
       _focusCyclesCompleted++;
       final nextBreak = _focusCyclesCompleted % focusCyclesBeforeLongBreak == 0
           ? FocusTimerPhase.longBreak
@@ -349,7 +382,7 @@ class FocusTimerViewModel extends ChangeNotifier {
       }
       _phase = FocusTimerPhase.focus;
       _remainingSeconds = _durationForPhase(_phase);
-      _sessionStartedAt = null;
+      _clearFocusSessionTracking();
       _isRunning = false;
       notifyListeners();
     } else {
@@ -360,35 +393,43 @@ class FocusTimerViewModel extends ChangeNotifier {
 
   void pause() {
     if (!_isRunning) return;
-    if (_phase == FocusTimerPhase.focus && _sessionStartedAt != null) {
-      final startedAt = _sessionStartedAt!;
-      _sessionStartedAt = null;
-      final endedAt = DateTime.now();
-      final elapsed = endedAt.difference(startedAt).inSeconds;
-      _saveSession(
-        startedAt: startedAt,
-        endedAt: endedAt,
+    if (_phase == FocusTimerPhase.focus && _focusRunStartedAt != null) {
+      _focusRunHadInterruption = true;
+      unawaited(_persistFocusSession(
+        startedAt: _focusRunStartedAt!,
+        endedAt: DateTime.now(),
         interrupted: true,
-        completed: elapsed >= _minCompletedSeconds,
-      );
+        completed: _focusElapsedCountsAsCompleted(_focusActiveSeconds, _plannedDurationSeconds),
+      ));
     }
     _stopTimer();
     _isRunning = false;
     notifyListeners();
   }
 
+  /// Whether an interrupted focus run counts as completed (≥80% of planned focus length).
+  bool _focusElapsedCountsAsCompleted(int elapsedSeconds, int plannedFocusSeconds) {
+    if (plannedFocusSeconds <= 0) return false;
+    final required = (plannedFocusSeconds * _minCompletedFocusFraction).ceil().clamp(1, plannedFocusSeconds);
+    return elapsedSeconds >= required;
+  }
+
   void reset() {
-    if (_phase == FocusTimerPhase.focus && _sessionStartedAt != null) {
-      final startedAt = _sessionStartedAt!;
-      _sessionStartedAt = null;
+    if (_phase == FocusTimerPhase.focus && _focusRunStartedAt != null) {
+      final startedAt = _focusRunStartedAt!;
       final endedAt = DateTime.now();
-      final elapsed = endedAt.difference(startedAt).inSeconds;
-      _saveSession(
+      final durationSec = _focusActiveSeconds;
+      final existingDocId = _persistedFocusSessionDocId;
+      final completed = _focusElapsedCountsAsCompleted(durationSec, _plannedDurationSeconds);
+      _clearFocusSessionTracking();
+      unawaited(_persistFocusSession(
         startedAt: startedAt,
         endedAt: endedAt,
         interrupted: true,
-        completed: elapsed >= _minCompletedSeconds,
-      );
+        completed: completed,
+        durationSecondsOverride: durationSec,
+        existingFirestoreDocId: existingDocId,
+      ));
     }
     _stopTimer();
     _remainingSeconds = _durationForPhase(_phase);
@@ -396,30 +437,62 @@ class FocusTimerViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _saveSession({
+  void _clearFocusSessionTracking() {
+    _focusRunStartedAt = null;
+    _focusActiveSeconds = 0;
+    _persistedFocusSessionDocId = null;
+    _focusRunHadInterruption = false;
+  }
+
+  /// End current focus run as interrupted (switching timer/phase or remote timer update).
+  Future<void> _flushFocusSessionInterrupted() async {
+    if (_focusRunStartedAt == null) return;
+    _focusRunHadInterruption = true;
+    await _persistFocusSession(
+      startedAt: _focusRunStartedAt!,
+      endedAt: DateTime.now(),
+      interrupted: true,
+      completed: _focusElapsedCountsAsCompleted(_focusActiveSeconds, _plannedDurationSeconds),
+    );
+    _clearFocusSessionTracking();
+  }
+
+  /// Writes one [focus_sessions] row: first time [add], then [update] the same doc until the run ends.
+  Future<void> _persistFocusSession({
     required DateTime startedAt,
     required DateTime endedAt,
     required bool interrupted,
     required bool completed,
+    int? durationSecondsOverride,
+    String? existingFirestoreDocId,
   }) async {
     if (_userId == null || _userId!.isEmpty) return;
-    final durationSeconds = endedAt.difference(startedAt).inSeconds;
+    final durationSeconds = durationSecondsOverride ?? _focusActiveSeconds;
     final sessionDate = DateTime(startedAt.year, startedAt.month, startedAt.day);
-    final session = FocusSessionModel(
-      id: '',
-      userId: _userId!,
-      timerId: _selectedTimerId,
-      durationSeconds: durationSeconds,
-      startedAt: startedAt,
-      endedAt: endedAt,
-      sessionDate: sessionDate,
-      interrupted: interrupted,
-      completed: completed,
-    );
+    final data = <String, dynamic>{
+      'user_id': _userId!,
+      'timer_id': _selectedTimerId,
+      'duration_seconds': durationSeconds,
+      'started_at': Timestamp.fromDate(startedAt),
+      'ended_at': Timestamp.fromDate(endedAt),
+      'session_date': FocusSessionModel.sessionDateToStorage(sessionDate),
+      'interrupted': interrupted,
+      'completed': completed,
+    };
+    final docId = existingFirestoreDocId ?? _persistedFocusSessionDocId;
     try {
-      await _db.collection('focus_sessions').add(session.toMap());
+      if (docId != null && docId.isNotEmpty) {
+        await _db.collection('focus_sessions').doc(docId).update(data);
+      } else {
+        final ref = await _db.collection('focus_sessions').add(data);
+        // Only track doc id while this focus attempt is still active (pause/resume). Natural
+        // completion clears [_focusRunStartedAt] before this Future runs — skip assigning.
+        if (_focusRunStartedAt != null) {
+          _persistedFocusSessionDocId = ref.id;
+        }
+      }
     } catch (e) {
-      print('FocusTimerViewModel: failed to save session: $e');
+      print('FocusTimerViewModel: failed to persist focus session: $e');
     }
   }
 

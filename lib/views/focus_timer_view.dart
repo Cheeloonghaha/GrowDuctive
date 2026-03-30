@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/focus_session_model.dart';
 import '../models/focus_timer_model.dart';
+import '../theme/app_colors.dart';
 import '../theme/growductive_chrome.dart';
 import '../navigation/sidebar_drawer_controller.dart';
 import '../viewmodels/focus_timer_viewmodel.dart';
@@ -187,81 +188,84 @@ class FocusTimerView extends StatelessWidget {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.3),
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Focus complete!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+      barrierColor: Colors.black.withValues(alpha: 0.3),
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final chrome = ctx.chrome;
+        final navBlue = chrome.navBlue;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: chrome.headerShadow.withValues(alpha: 0.12),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Start $breakLabel?',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[700],
-                  height: 1.35,
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Focus complete!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: navBlue,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 28),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(ctx).pop(),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: Colors.grey[300]!),
+                const SizedBox(height: 12),
+                Text(
+                  'Start $breakLabel?',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: scheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          foregroundColor: navBlue,
+                          side: BorderSide(color: chrome.segmentBorder),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                         ),
-                        child: const Center(
-                          child: Text(
-                            'Not now',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                            ),
+                        child: const Text(
+                          'Not now',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        vm.start();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          borderRadius: BorderRadius.circular(999),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          vm.start();
+                        },
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: navBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -284,13 +288,13 @@ class FocusTimerView extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -718,16 +722,18 @@ class FocusTimerView extends StatelessWidget {
 class _CustomTimersSheet extends StatelessWidget {
   const _CustomTimersSheet();
 
-  Widget _compactIconAction({
+  Widget _compactIconAction(
+    BuildContext context, {
     required IconData icon,
     required VoidCallback onPressed,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return IconButton(
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
       iconSize: 19,
-      style: IconButton.styleFrom(foregroundColor: Colors.black45),
+      style: IconButton.styleFrom(foregroundColor: scheme.onSurfaceVariant),
       icon: Icon(icon),
       onPressed: onPressed,
     );
@@ -735,9 +741,12 @@ class _CustomTimersSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final chrome = context.chrome;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: context.chrome.scaffoldBackground,
+        color: chrome.scaffoldBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
@@ -752,13 +761,13 @@ class _CustomTimersSheet extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Custom Timers',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: scheme.onSurface,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -768,7 +777,7 @@ class _CustomTimersSheet extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, size: 22),
+                icon: Icon(Icons.close, size: 22, color: scheme.onSurface),
               ),
             ],
           ),
@@ -789,18 +798,22 @@ class _CustomTimersSheet extends StatelessWidget {
                         _showAddTimerDialog(context);
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        side: const BorderSide(color: Colors.black87, width: 1),
+                        foregroundColor: scheme.onSurface,
+                        side: BorderSide(
+                          color: scheme.outline.withValues(alpha: isDark ? 0.55 : 0.45),
+                          width: 1,
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         visualDensity: VisualDensity.compact,
                       ),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text(
+                      icon: Icon(Icons.add, size: 18, color: scheme.onSurface),
+                      label: Text(
                         'Add custom timer',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          color: scheme.onSurface,
                         ),
                       ),
                     );
@@ -813,10 +826,12 @@ class _CustomTimersSheet extends StatelessWidget {
                   final longM = timer.longBreakSeconds ~/ 60;
                   return Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: scheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSelected ? Colors.black : Colors.grey.shade200,
+                        color: isSelected
+                            ? scheme.primary
+                            : scheme.outline.withValues(alpha: isDark ? 0.45 : 0.35),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -832,10 +847,10 @@ class _CustomTimersSheet extends StatelessWidget {
                                 timer.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
+                                  color: scheme.onSurface,
                                   height: 1.2,
                                 ),
                               ),
@@ -846,7 +861,9 @@ class _CustomTimersSheet extends StatelessWidget {
                                 if (context.mounted) Navigator.pop(context);
                               },
                               style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF6B4EFF),
+                                foregroundColor: isDark
+                                    ? AppColors.interactive.withValues(alpha: 0.95)
+                                    : const Color(0xFF5B3FD9),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
                                   vertical: 0,
@@ -864,10 +881,12 @@ class _CustomTimersSheet extends StatelessWidget {
                               ),
                             ),
                             _compactIconAction(
+                              context,
                               icon: Icons.edit_outlined,
                               onPressed: () => _showEditTimerDialog(context, timer),
                             ),
                             _compactIconAction(
+                              context,
                               icon: Icons.delete_outline,
                               onPressed: () =>
                                   _confirmDeleteTimer(context, vm, timer.id, timer.name),
@@ -880,7 +899,7 @@ class _CustomTimersSheet extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11.5,
                             height: 1.25,
-                            color: Colors.grey[700],
+                            color: scheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -889,7 +908,7 @@ class _CustomTimersSheet extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11.5,
                             height: 1.25,
-                            color: Colors.grey[600],
+                            color: scheme.onSurfaceVariant.withValues(alpha: 0.9),
                           ),
                         ),
                       ],

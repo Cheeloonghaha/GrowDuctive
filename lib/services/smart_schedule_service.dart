@@ -30,7 +30,8 @@ class SmartScheduleConfig {
   final int dayEndMinutes;
   /// Break duration in minutes between tasks.
   final int breakDurationMinutes;
-  /// Insert a break after every [breakAfterTaskMinutes] minutes of task time.
+  /// Insert a break after every [breakAfterTaskMinutes] minutes of **cumulative**
+  /// scheduled task time (across tasks). Does not split a single task into multiple slots.
   /// 0 = insert a break after every task (legacy behavior).
   final int breakAfterTaskMinutes;
   /// Snap step in minutes (e.g. 15).
@@ -109,74 +110,109 @@ class SmartScheduleService {
     int taskMinutesSinceBreak = 0;
 
     for (final task in sorted) {
-      final duration = _snapTo(task.duration.clamp(1, 24 * 60), config.snapMinutes);
-      if (duration <= 0) continue;
+      final snappedDuration =
+          _snapTo(task.duration.clamp(1, 24 * 60), config.snapMinutes);
+      var remaining = snappedDuration;
+      if (remaining <= 0) continue;
 
-      int start = _snapTo(current, config.snapMinutes);
-      int end = start + duration;
-
-      // Skip forward to avoid overlaps with existing calendar blocks.
-      final adjusted = _adjustForExistingBlocks(
-        start: start,
-        end: end,
-        duration: duration,
-        dayStart: config.dayStartMinutes,
-        dayEnd: dayEnd,
-        snapMinutes: config.snapMinutes,
-        existingBlocks: existingBlocks,
-      );
-      if (adjusted == null) {
-        hasOverflow = true;
-        overflowCount++;
-        continue;
-      }
-      start = adjusted.$1;
-      end = adjusted.$2;
-
-      if (start >= dayEnd) {
-        hasOverflow = true;
-        overflowCount++;
-        continue;
-      }
-      if (end > dayEnd) {
-        end = dayEnd;
-        start = end - duration;
-        if (start < config.dayStartMinutes) {
-          hasOverflow = true;
-          overflowCount++;
+      while (remaining > 0) {
+        // --- Mandatory rest after [breakAfterTaskMinutes] of scheduled work ---
+        if (config.breakAfterTaskMinutes > 0 &&
+            taskMinutesSinceBreak >= config.breakAfterTaskMinutes) {
+          if (config.breakDurationMinutes > 0) {
+            final breakEnd = current + config.breakDurationMinutes;
+            if (breakEnd <= dayEnd) {
+              slots.add(ProposedSlot(
+                taskId: '',
+                taskTitle: 'Break',
+                date: dateOnly,
+                startMinutes: current,
+                endMinutes: breakEnd,
+                isBreak: true,
+              ));
+              current = breakEnd;
+            } else {
+              hasOverflow = true;
+              overflowCount++;
+              remaining = 0;
+              break;
+            }
+          }
+          taskMinutesSinceBreak = 0;
           continue;
         }
-      }
 
-      slots.add(ProposedSlot(
-        taskId: task.id,
-        taskTitle: task.title,
-        date: dateOnly,
-        startMinutes: start,
-        endMinutes: end,
-        isBreak: false,
-      ));
-      taskMinutesSinceBreak += duration;
-      current = end;
+        // One calendar block per task (no splitting across multiple slots).
+        final chunk = remaining;
 
-      final shouldInsertBreak = config.breakDurationMinutes > 0 &&
-          (config.breakAfterTaskMinutes <= 0
-              ? true
-              : taskMinutesSinceBreak >= config.breakAfterTaskMinutes);
-      if (shouldInsertBreak) {
-        final breakEnd = current + config.breakDurationMinutes;
-        if (breakEnd <= dayEnd) {
-          slots.add(ProposedSlot(
-            taskId: '',
-            taskTitle: 'Break',
-            date: dateOnly,
-            startMinutes: current,
-            endMinutes: breakEnd,
-            isBreak: true,
-          ));
-          current = breakEnd;
+        int start = _snapTo(current, config.snapMinutes);
+        int end = start + chunk;
+
+        final adjusted = _adjustForExistingBlocks(
+          start: start,
+          end: end,
+          duration: chunk,
+          dayStart: config.dayStartMinutes,
+          dayEnd: dayEnd,
+          snapMinutes: config.snapMinutes,
+          existingBlocks: existingBlocks,
+        );
+        if (adjusted == null) {
+          hasOverflow = true;
+          overflowCount++;
+          remaining = 0;
+          break;
         }
-        taskMinutesSinceBreak = 0;
+        start = adjusted.$1;
+        end = adjusted.$2;
+
+        if (start >= dayEnd) {
+          hasOverflow = true;
+          overflowCount++;
+          remaining = 0;
+          break;
+        }
+        if (end > dayEnd) {
+          end = dayEnd;
+          start = end - chunk;
+          if (start < config.dayStartMinutes) {
+            hasOverflow = true;
+            overflowCount++;
+            remaining = 0;
+            break;
+          }
+        }
+
+        slots.add(ProposedSlot(
+          taskId: task.id,
+          taskTitle: task.title,
+          date: dateOnly,
+          startMinutes: start,
+          endMinutes: end,
+          isBreak: false,
+        ));
+        taskMinutesSinceBreak += chunk;
+        current = end;
+        remaining -= chunk;
+
+        // Legacy: short break after every full task when "break after" is not used.
+        if (config.breakAfterTaskMinutes <= 0 &&
+            config.breakDurationMinutes > 0 &&
+            remaining <= 0) {
+          final breakEnd = current + config.breakDurationMinutes;
+          if (breakEnd <= dayEnd) {
+            slots.add(ProposedSlot(
+              taskId: '',
+              taskTitle: 'Break',
+              date: dateOnly,
+              startMinutes: current,
+              endMinutes: breakEnd,
+              isBreak: true,
+            ));
+            current = breakEnd;
+          }
+          taskMinutesSinceBreak = 0;
+        }
       }
     }
 

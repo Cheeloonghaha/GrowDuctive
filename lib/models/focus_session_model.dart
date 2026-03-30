@@ -29,11 +29,12 @@ class FocusSessionModel {
   /// Convenience field: calendar day (YYYY-MM-DD at midnight) for grouping.
   final DateTime sessionDate;
 
-  /// True if the user paused or reset before the timer reached zero.
+  /// True if this run included an interruption (e.g. at least one pause) or ended via reset/flush.
+  /// Stays true on the final write even when [completed] is also true (independent booleans).
   final bool interrupted;
 
-  /// True if the session counted as "completed" (e.g. ran at least half of planned time).
-  /// For testing: true when durationSeconds >= 60. Later can use half of planned duration.
+  /// True if the session met the "completed" criteria (timer finished or active time ≥ threshold).
+  /// Independent of [interrupted]; both may be true (e.g. paused then ran to zero).
   final bool completed;
 
   FocusSessionModel({

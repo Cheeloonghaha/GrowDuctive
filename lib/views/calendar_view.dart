@@ -9,10 +9,11 @@ import '../models/user_preferences_model.dart';
 import '../models/task_model.dart';
 import '../models/scheduled_task_model.dart';
 import '../models/category_model.dart';
+import '../services/notification_service.dart';
 import '../services/smart_schedule_service.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/growductive_chrome.dart';
+import '../widgets/add_task_bottom_sheet.dart';
 import '../widgets/calendar_speed_dial.dart';
 import '../widgets/calendar_week_strip.dart';
 import '../widgets/schedule_preview_dialog.dart';
@@ -196,65 +197,52 @@ class _CalendarViewState extends State<CalendarView> {
   }
 
   Widget _buildWeekStrip(ScheduledTaskViewModel scheduledVM) {
-    final prefsVM = Provider.of<UserPreferencesViewModel>(
-      context,
-      listen: false,
+    final navBlue = context.chrome.navBlue;
+    final weekStart = CalendarWeekStrip.weekStartContaining(
+      _selectedDate,
+      UserPreferencesModel.weekMonday,
     );
 
-    final navBlue = context.chrome.navBlue;
-
-    return StreamBuilder<UserPreferencesModel?>(
-      stream: prefsVM.preferencesStream,
-      builder: (context, snap) {
-        final weekStartsOn =
-            snap.data?.weekStartsOn ?? UserPreferencesModel.weekMonday;
-        final weekStart = CalendarWeekStrip.weekStartContaining(
-          _selectedDate,
-          weekStartsOn,
-        );
-
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  onSurface: navBlue,
-                  primary: navBlue,
-                ),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: Theme.of(context).colorScheme.copyWith(
+              onSurface: navBlue,
+              primary: navBlue,
+            ),
+      ),
+      child: Container(
+        color: context.chrome.scaffoldBackground,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: FutureBuilder<Map<DateTime, List<ScheduledTaskModel>>>(
+          key: ValueKey(
+            '${weekStart.year}-${weekStart.month}-${weekStart.day}',
           ),
-          child: Container(
-            color: context.chrome.scaffoldBackground,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: FutureBuilder<Map<DateTime, List<ScheduledTaskModel>>>(
-              key: ValueKey(
-                '${weekStart.year}-${weekStart.month}-${weekStart.day}',
-              ),
-              future: scheduledVM.fetchScheduledTasksForRange(
-                weekStart,
-                weekStart.add(const Duration(days: 6)),
-              ),
-              builder: (context, countSnap) {
-                final map = countSnap.data ?? {};
-                final counts = List.generate(7, (i) {
-                  final d = weekStart.add(Duration(days: i));
-                  final key = DateTime(d.year, d.month, d.day);
-                  return (map[key] ?? []).length;
-                });
+          future: scheduledVM.fetchScheduledTasksForRange(
+            weekStart,
+            weekStart.add(const Duration(days: 6)),
+          ),
+          builder: (context, countSnap) {
+            final map = countSnap.data ?? {};
+            final counts = List.generate(7, (i) {
+              final d = weekStart.add(Duration(days: i));
+              final key = DateTime(d.year, d.month, d.day);
+              return (map[key] ?? []).length;
+            });
 
-                return CalendarWeekStrip(
-                  weekStart: weekStart,
-                  selectedDate: _selectedDate,
-                  onDaySelected: _onDateChanged,
-                  onWeekShift: (delta) {
-                    _onDateChanged(
-                      _selectedDate.add(Duration(days: 7 * delta)),
-                    );
-                  },
-                  taskCountsForWeek: counts,
+            return CalendarWeekStrip(
+              weekStart: weekStart,
+              selectedDate: _selectedDate,
+              onDaySelected: _onDateChanged,
+              onWeekShift: (delta) {
+                _onDateChanged(
+                  _selectedDate.add(Duration(days: 7 * delta)),
                 );
               },
-            ),
-          ),
-        );
-      },
+              taskCountsForWeek: counts,
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -433,7 +421,6 @@ class _CalendarViewState extends State<CalendarView> {
       context,
       listen: false,
     );
-    final prefs = await userPrefsVM.fetchPreferences();
 
     final tasks = await taskVM.fetchPendingTasksForSmartSchedule(
       _selectedDate,
@@ -477,6 +464,10 @@ class _CalendarViewState extends State<CalendarView> {
         .where((t) => selectedTaskIds.contains(t.id))
         .toList();
     if (toSchedule.isEmpty) return;
+
+    // Load prefs after task selection so we use the latest saved values (not a stale
+    // fetch from before the sheet, or before ensureDefaults finished).
+    final prefs = await userPrefsVM.fetchPreferences();
 
     final result = SmartScheduleService.generateSchedule(
       date: _selectedDate,
@@ -1522,461 +1513,20 @@ class _CalendarViewState extends State<CalendarView> {
     TaskViewModel taskVM,
     ScheduledTaskViewModel scheduledVM,
   ) {
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final durationController = TextEditingController(text: '30');
-    String? selectedCategoryId;
-    int urgency = 3;
-    int importance = 3;
-    TimeOfDay scheduleTime = const TimeOfDay(hour: 9, minute: 0);
-
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.add_task,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Add Task',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => Navigator.pop(ctx),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatHeaderDate(_selectedDate),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: titleController,
-                            decoration: InputDecoration(
-                              labelText: 'Task Title',
-                              hintText: 'Enter task title',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            autofocus: true,
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: descriptionController,
-                            decoration: InputDecoration(
-                              labelText: 'Description (Optional)',
-                              hintText: 'Enter description',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            maxLines: 2,
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: durationController,
-                            decoration: InputDecoration(
-                              labelText: 'Duration (minutes)',
-                              hintText: 'e.g. 30',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                          const SizedBox(height: 12),
-                          InkWell(
-                            onTap: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: scheduleTime,
-                              );
-                              if (picked != null) {
-                                setDialogState(() => scheduleTime = picked);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: InputDecorator(
-                              decoration: InputDecoration(
-                                labelText: 'Time on calendar',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey[300]!,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                    color: Colors.black,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                              child: Text(
-                                scheduleTime.format(context),
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          StreamBuilder<List<CategoryModel>>(
-                            stream: taskVM.categoriesStream,
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) {
-                                return const SizedBox(
-                                  height: 56,
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              }
-                              final categories = snapshot.data!;
-                              if (categories.isEmpty) {
-                                return const Text(
-                                  'No categories. Add one in Tasks.',
-                                );
-                              }
-                              if (selectedCategoryId == null &&
-                                  categories.isNotEmpty) {
-                                selectedCategoryId = categories.first.id;
-                              }
-                              return DropdownButtonFormField<String>(
-                                value: selectedCategoryId,
-                                decoration: InputDecoration(
-                                  labelText: 'Category',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Colors.grey[300]!,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: Colors.black,
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                                items: categories
-                                    .map(
-                                      (c) => DropdownMenuItem(
-                                        value: c.id,
-                                        child: Text(c.name),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (value) => setDialogState(
-                                  () => selectedCategoryId = value,
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Urgency',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SliderTheme(
-                                  data: SliderThemeData(
-                                    activeTrackColor: Colors.black,
-                                    inactiveTrackColor: Colors.grey[300],
-                                    thumbColor: Colors.black,
-                                  ),
-                                  child: Slider(
-                                    value: urgency.toDouble(),
-                                    min: 1,
-                                    max: 5,
-                                    divisions: 4,
-                                    onChanged: (v) => setDialogState(
-                                      () => urgency = v.toInt(),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '$urgency',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            'Importance',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SliderTheme(
-                                  data: SliderThemeData(
-                                    activeTrackColor: Colors.black,
-                                    inactiveTrackColor: Colors.grey[300],
-                                    thumbColor: Colors.black,
-                                  ),
-                                  child: Slider(
-                                    value: importance.toDouble(),
-                                    min: 1,
-                                    max: 5,
-                                    divisions: 4,
-                                    onChanged: (v) => setDialogState(
-                                      () => importance = v.toInt(),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '$importance',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: Colors.grey[400]!),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final title = titleController.text.trim();
-                              if (title.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter a task title'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
-                              final catId = selectedCategoryId;
-                              if (catId == null || catId.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please select a category'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
-                              final duration =
-                                  int.tryParse(durationController.text) ?? 30;
-                              final dateOnly = DateTime(
-                                _selectedDate.year,
-                                _selectedDate.month,
-                                _selectedDate.day,
-                              );
-                              final taskId = await taskVM.addTask(
-                                title: title,
-                                description: descriptionController.text.trim(),
-                                urgency: urgency,
-                                importance: importance,
-                                duration: duration,
-                                categoryId: catId,
-                                taskDate: dateOnly,
-                              );
-                              if (!ctx.mounted) return;
-                              Navigator.pop(ctx);
-                              if (taskId != null) {
-                                final startMinutes =
-                                    scheduleTime.hour * 60 +
-                                    scheduleTime.minute;
-                                try {
-                                  await scheduledVM.addScheduledTask(
-                                    taskId: taskId,
-                                    scheduleDate: _selectedDate,
-                                    startTimeMinutes: startMinutes,
-                                    endTimeMinutes: startMinutes + duration,
-                                    taskName: title,
-                                    taskStatus: 'pending',
-                                  );
-                                } catch (_) {}
-                                if (ctx.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Added: $title (Tasks & Calendar)',
-                                      ),
-                                      backgroundColor: Colors.black,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Failed to add task'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'Add Task',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+    AddTaskBottomSheet.show(
+      context,
+      taskVM: taskVM,
+      scheduledTaskVM: scheduledVM,
+      initialTaskDate: DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
       ),
+      onTaskCreated: (taskDay) {
+        if (mounted) {
+          setState(() => _selectedDate = taskDay);
+        }
+      },
     );
   }
 
@@ -2935,16 +2485,8 @@ class _CalendarViewState extends State<CalendarView> {
     TaskViewModel taskVM,
     TaskModel? task,
   ) {
-    // Prefs future + reminder UI state must live *outside* the modal `builder`.
-    // If they are created inside `builder`, every route rebuild (e.g. Firestore stream
-    // on Android) recreates the Set and re-inits from [st], wiping edits and re-saving
-    // stale offsets (Chrome often doesn't hit the same rebuild timing).
-    final userPrefsVM = Provider.of<UserPreferencesViewModel>(
-      context,
-      listen: false,
-    );
-    final prefsFuture = userPrefsVM.fetchPreferences();
-
+    // Reminder UI state must live *outside* the modal `builder` so route rebuilds
+    // don't recreate the Set and wipe edits.
     final selectedOffsetsState = <int>{};
     var didInitReminderState = false;
     var remindersEnabledState = true;
@@ -2961,17 +2503,11 @@ class _CalendarViewState extends State<CalendarView> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return FutureBuilder<UserPreferencesModel?>(
-              future: prefsFuture,
-              builder: (context, prefsSnap) {
-                final prefs = prefsSnap.data;
                 final scheme = Theme.of(context).colorScheme;
 
-                if (!didInitReminderState &&
-                    prefsSnap.connectionState != ConnectionState.waiting) {
+                if (!didInitReminderState) {
                   didInitReminderState = true;
-                  remindersEnabledState =
-                      st.remindersEnabled ?? prefs?.remindersEnabled ?? true;
+                  remindersEnabledState = st.remindersEnabled ?? true;
                   selectedOffsetsState
                     ..clear()
                     ..addAll(st.reminderOffsetsMinutes);
@@ -3024,10 +2560,9 @@ class _CalendarViewState extends State<CalendarView> {
                       endTimeMinutes: st.endTime,
                       reminderOffsetsMinutes: selectedOffsetsState.toList(),
                       remindersEnabled: remindersEnabledState,
-                      prefs: prefs,
                     );
                     final effectiveOffsets = selectedOffsetsState.isEmpty
-                        ? <int>[prefs?.defaultReminderMinutesBefore ?? 0]
+                        ? <int>[NotificationService.kDefaultReminderMinutesBefore]
                         : selectedOffsetsState.toList();
                     effectiveOffsets.removeWhere((v) => v <= 0);
                     effectiveOffsets.sort((a, b) => b.compareTo(a));
@@ -3372,10 +2907,7 @@ class _CalendarViewState extends State<CalendarView> {
                                         ),
                                       );
                                       try {
-                                        await scheduledVM.deleteScheduledTask(
-                                          st.id,
-                                          prefs: prefs,
-                                        );
+                                        await scheduledVM.deleteScheduledTask(st.id);
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(
                                             context,
@@ -3471,8 +3003,6 @@ class _CalendarViewState extends State<CalendarView> {
                     ),
                   ),
                 );
-              },
-            );
           },
         );
       },

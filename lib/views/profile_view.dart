@@ -480,29 +480,82 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
   int _breakAfter = 0; // 0 = after every task
   late final TextEditingController _breakDurationController;
   late final TextEditingController _breakAfterController;
-  late final TextEditingController _defaultReminderController;
-  late final TextEditingController _quietHoursStartController;
-  late final TextEditingController _quietHoursEndController;
-  bool _remindersEnabled = true;
-  int _defaultReminderMinutesBefore = 15;
-  int? _quietHoursStartMinutes;
-  int? _quietHoursEndMinutes;
-  int _weekStartsOn = 1; // 1 = Monday, 7 = Sunday
   String _theme = 'light'; // 'light' | 'dark'
-  bool _timerSoundEnabled = true;
-  bool _timerVibrationEnabled = true;
   bool _loading = true;
   bool _saving = false;
+  bool _savingBreakOrganizer = false;
+
+  /// Unfocus fields (commit IME), then validate and set [_breakDuration] / [_breakAfter].
+  /// Returns false if validation failed (snackbar shown).
+  bool _validateBreakFieldsForSave() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final parsedDuration = int.tryParse(_breakDurationController.text.trim());
+    if (parsedDuration == null || parsedDuration <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid break duration in minutes'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+    _breakDuration = parsedDuration;
+    final breakAfterText = _breakAfterController.text.trim();
+    if (breakAfterText.isEmpty) {
+      _breakAfter = 0;
+    } else {
+      final parsedAfter = int.tryParse(breakAfterText);
+      if (parsedAfter == null || parsedAfter < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid "insert a break after" value'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+      _breakAfter = parsedAfter;
+    }
+    return true;
+  }
+
+  Future<void> _saveSmartOrganizerSectionOnly(UserPreferencesViewModel prefsVM) async {
+    if (!_validateBreakFieldsForSave()) return;
+    setState(() => _savingBreakOrganizer = true);
+    try {
+      await prefsVM.updateScheduleBreakPreferences(
+        breakDurationMinutes: _breakDuration,
+        breakAfterTaskMinutes: _breakAfter,
+      );
+      if (!mounted) return;
+      setState(() {
+        _breakDurationController.text = _breakDuration.toString();
+        _breakAfterController.text = _breakAfter <= 0 ? '' : _breakAfter.toString();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Smart Task Organizer settings saved')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save organizer settings: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _savingBreakOrganizer = false);
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _breakDurationController = TextEditingController(text: _breakDuration.toString());
     _breakAfterController = TextEditingController(text: '');
-    _defaultReminderController =
-        TextEditingController(text: _defaultReminderMinutesBefore.toString());
-    _quietHoursStartController = TextEditingController(text: '');
-    _quietHoursEndController = TextEditingController(text: '');
     final prefsVM = Provider.of<UserPreferencesViewModel>(context, listen: false);
     prefsVM.fetchPreferences().then((prefs) {
       if (!mounted || prefs == null) {
@@ -516,17 +569,7 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
         _breakAfter = prefs.breakAfterTaskMinutes;
         _breakDurationController.text = _breakDuration.toString();
         _breakAfterController.text = _breakAfter <= 0 ? '' : _breakAfter.toString();
-        _remindersEnabled = prefs.remindersEnabled;
-        _defaultReminderMinutesBefore = prefs.defaultReminderMinutesBefore;
-        _quietHoursStartMinutes = prefs.quietHoursStartMinutes;
-        _quietHoursEndMinutes = prefs.quietHoursEndMinutes;
-        _defaultReminderController.text = _defaultReminderMinutesBefore.toString();
-        _quietHoursStartController.text = _quietHoursStartMinutes?.toString() ?? '';
-        _quietHoursEndController.text = _quietHoursEndMinutes?.toString() ?? '';
-        _weekStartsOn = prefs.weekStartsOn;
         _theme = _normalizeThemeChoice(prefs.theme);
-        _timerSoundEnabled = prefs.timerSoundEnabled;
-        _timerVibrationEnabled = prefs.timerVibrationEnabled;
         _loading = false;
       });
     });
@@ -536,9 +579,6 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
   void dispose() {
     _breakDurationController.dispose();
     _breakAfterController.dispose();
-    _defaultReminderController.dispose();
-    _quietHoursStartController.dispose();
-    _quietHoursEndController.dispose();
     super.dispose();
   }
 
@@ -584,6 +624,48 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
       focusedBorder: outline(scheme.primary, 2),
       border: outline(
         isDark ? scheme.outline.withValues(alpha: 0.5) : Colors.grey.shade400,
+      ),
+    );
+  }
+
+  /// Bordered outline save (matches Smart Task Organizer + bottom Save).
+  Widget _buildPrefsSaveButton({
+    required VoidCallback? onPressed,
+    required bool loading,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: loading
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
+            )
+          : Icon(Icons.save_outlined, size: 18, color: scheme.primary),
+      label: Text(
+        'Save',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: scheme.primary,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        minimumSize: const Size(96, 42),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        side: BorderSide(
+          color: scheme.primary.withValues(alpha: 0.88),
+          width: 1.5,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        foregroundColor: scheme.primary,
       ),
     );
   }
@@ -661,7 +743,6 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
     final prefsVM = Provider.of<UserPreferencesViewModel>(context, listen: false);
     final scheme = Theme.of(context).colorScheme;
     final fieldStyle = TextStyle(fontSize: 14, color: scheme.onSurface);
-    final subStyle = TextStyle(fontSize: 12, color: scheme.onSurfaceVariant);
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -725,120 +806,15 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                               }
                             },
                           ),
-                        ],
-                      ),
-                      _sectionCard(context,
-                        icon: Icons.schedule_outlined,
-                        title: 'Reminders & quiet hours',
-                        children: [
-                          SwitchListTile(
-                            visualDensity: VisualDensity.standard,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
-                            title: Text(
-                              'Task reminders',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Enable reminders for upcoming tasks',
-                              style: subStyle,
-                            ),
-                            value: _remindersEnabled,
-                            onChanged: (v) => setState(() => _remindersEnabled = v),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _defaultReminderController,
-                            keyboardType: TextInputType.number,
-                            style: fieldStyle,
-                            decoration: _fieldDecoration(context,
-                              labelText: 'Default reminder (minutes before)',
-                              hintText: 'e.g. 15',
-                            ),
-                            onChanged: (v) {
-                              final parsed = int.tryParse(v);
-                              if (parsed != null && parsed > 0) {
-                                _defaultReminderMinutesBefore = parsed;
-                              }
-                            },
-                          ),
                           const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _quietHoursStartController,
-                                  keyboardType: TextInputType.number,
-                                  style: fieldStyle,
-                                  decoration: _fieldDecoration(context,
-                                    labelText: 'Quiet hours start',
-                                    hintText: 'Optional (minutes)',
-                                  ),
-                                  onChanged: (v) {
-                                    if (v.trim().isEmpty) {
-                                      _quietHoursStartMinutes = null;
-                                    } else {
-                                      final parsed = int.tryParse(v);
-                                      if (parsed != null && parsed >= 0) {
-                                        _quietHoursStartMinutes = parsed;
-                                      }
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  controller: _quietHoursEndController,
-                                  keyboardType: TextInputType.number,
-                                  style: fieldStyle,
-                                  decoration: _fieldDecoration(context,
-                                    labelText: 'Quiet hours end',
-                                    hintText: 'Optional (minutes)',
-                                  ),
-                                  onChanged: (v) {
-                                    if (v.trim().isEmpty) {
-                                      _quietHoursEndMinutes = null;
-                                    } else {
-                                      final parsed = int.tryParse(v);
-                                      if (parsed != null && parsed >= 0) {
-                                        _quietHoursEndMinutes = parsed;
-                                      }
-                                    }
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      _sectionCard(context,
-                        icon: Icons.calendar_month_outlined,
-                        title: 'Calendar',
-                        children: [
-                          DropdownButtonFormField<int>(
-                            value: _weekStartsOn,
-                            style: fieldStyle,
-                            decoration: _fieldDecoration(context,
-                              labelText: 'Week starts on',
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: _buildPrefsSaveButton(
+                              onPressed: (_loading || _saving || _savingBreakOrganizer)
+                                  ? null
+                                  : () => _saveSmartOrganizerSectionOnly(prefsVM),
+                              loading: _savingBreakOrganizer,
                             ),
-                            items: [
-                              DropdownMenuItem(
-                                value: 1,
-                                child: Text('Monday', style: fieldStyle),
-                              ),
-                              DropdownMenuItem(
-                                value: 7,
-                                child: Text('Sunday', style: fieldStyle),
-                              ),
-                            ],
-                            onChanged: (v) {
-                              if (v == null) return;
-                              setState(() => _weekStartsOn = v);
-                            },
                           ),
                         ],
                       ),
@@ -872,48 +848,6 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                           ),
                         ],
                       ),
-                      _sectionCard(context,
-                        icon: Icons.timer_outlined,
-                        title: 'Focus timer',
-                        children: [
-                          SwitchListTile(
-                            visualDensity: VisualDensity.standard,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
-                            title: Text(
-                              'Sound',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Play sound when a session ends',
-                              style: subStyle,
-                            ),
-                            value: _timerSoundEnabled,
-                            onChanged: (v) => setState(() => _timerSoundEnabled = v),
-                          ),
-                          SwitchListTile(
-                            visualDensity: VisualDensity.standard,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 2),
-                            title: Text(
-                              'Vibration',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Vibrate when a session ends (mobile only)',
-                              style: subStyle,
-                            ),
-                            value: _timerVibrationEnabled,
-                            onChanged: (v) => setState(() => _timerVibrationEnabled = v),
-                          ),
-                        ],
-                      ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -928,46 +862,11 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                             ),
                             const SizedBox(width: 6),
                           ],
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                            ),
-                            onPressed: _saving
+                          _buildPrefsSaveButton(
+                            onPressed: (_saving || _savingBreakOrganizer)
                                 ? null
                                 : () async {
-                                    final parsedDuration =
-                                        int.tryParse(_breakDurationController.text);
-                                    if (parsedDuration == null || parsedDuration <= 0) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Please enter a valid break duration in minutes'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    _breakDuration = parsedDuration;
-
-                                    final breakAfterText =
-                                        _breakAfterController.text.trim();
-                                    if (breakAfterText.isEmpty) {
-                                      _breakAfter = 0; // every task
-                                    } else {
-                                      final parsedAfter = int.tryParse(breakAfterText);
-                                      if (parsedAfter == null || parsedAfter < 0) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Please enter a valid "insert a break after" value'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      _breakAfter = parsedAfter;
-                                    }
+                                    if (!_validateBreakFieldsForSave()) return;
 
                                     setState(() {
                                       _saving = true;
@@ -976,18 +875,6 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                                       await prefsVM.updateScheduleBreakPreferences(
                                         breakDurationMinutes: _breakDuration,
                                         breakAfterTaskMinutes: _breakAfter,
-                                      );
-                                      await prefsVM.updateReminderPreferences(
-                                        remindersEnabled: _remindersEnabled,
-                                        defaultReminderMinutesBefore:
-                                            _defaultReminderMinutesBefore,
-                                        quietHoursStartMinutes: _quietHoursStartMinutes,
-                                        quietHoursEndMinutes: _quietHoursEndMinutes,
-                                      );
-                                      await prefsVM.updateWeekStartsOn(_weekStartsOn);
-                                      await prefsVM.updateFocusTimerPreferences(
-                                        timerSoundEnabled: _timerSoundEnabled,
-                                        timerVibrationEnabled: _timerVibrationEnabled,
                                       );
                                       if (mounted) {
                                         if (!widget.embedded) {
@@ -1017,14 +904,7 @@ class _ProfilePreferencesFormState extends State<_ProfilePreferencesForm> {
                                       }
                                     }
                                   },
-                            child: _saving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child:
-                                        CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Text('Save'),
+                            loading: _saving,
                           ),
                         ],
                       ),

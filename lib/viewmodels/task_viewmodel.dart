@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task_model.dart';
 import '../models/category_model.dart';
 import '../models/scheduled_task_model.dart';
-import '../models/user_preferences_model.dart';
 import '../services/notification_service.dart';
 
 class TaskViewModel extends ChangeNotifier {
@@ -276,7 +275,7 @@ class TaskViewModel extends ChangeNotifier {
   /// https://firebase.google.com/docs/firestore/security/rules-query
   ///
   /// Composite index: `scheduled_tasks` → `task_id` ASC, `user_id` ASC (see firestore.indexes.json).
-  Future<void> deleteTask(String id, {UserPreferencesModel? userPrefs}) async {
+  Future<void> deleteTask(String id) async {
     try {
       final scheduledSnapshot = await _db
           .collection('scheduled_tasks')
@@ -292,7 +291,6 @@ class TaskViewModel extends ChangeNotifier {
           await NotificationService.instance.cancelTaskReminders(
             scheduledTaskId: doc.id,
             offsetsMinutes: st.reminderOffsetsMinutes,
-            prefs: userPrefs,
           );
         } catch (e) {
           debugPrint('TaskViewModel: cancel reminders for ${doc.id}: $e');
@@ -329,6 +327,7 @@ class TaskViewModel extends ChangeNotifier {
     String? status,
     int? startTime,
     int? endTime,
+    DateTime? taskDate,
   }) async {
     try {
       final updateData = <String, dynamic>{
@@ -342,6 +341,10 @@ class TaskViewModel extends ChangeNotifier {
         'start_time': startTime,
         'end_time': endTime,
       };
+      if (taskDate != null) {
+        final day = DateTime(taskDate.year, taskDate.month, taskDate.day);
+        updateData['task_date'] = Timestamp.fromDate(day);
+      }
       
       // If status is being updated, handle completedAt and overdue
       if (status != null) {

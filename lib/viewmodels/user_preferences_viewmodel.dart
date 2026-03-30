@@ -15,10 +15,17 @@ class UserPreferencesViewModel extends ChangeNotifier {
       _cachedPrefsStream = null;
       _cachedPrefsStreamUserId = null;
       _optimisticTheme = null;
+      _latestPreferencesSnapshot = null;
     }
     _userId = userId;
     notifyListeners();
   }
+
+  /// Last preferences from the Firestore listener or [fetchPreferences]. Cleared on user switch.
+  UserPreferencesModel? _latestPreferencesSnapshot;
+
+  /// Latest known preferences (stream snapshot or last fetch). Cleared on user switch.
+  UserPreferencesModel? get latestPreferencesSnapshot => _latestPreferencesSnapshot;
 
   /// While Firestore syncs, we show this theme immediately for responsive UI.
   String? _optimisticTheme;
@@ -42,8 +49,12 @@ class UserPreferencesViewModel extends ChangeNotifier {
     if (_cachedPrefsStreamUserId != uid || _cachedPrefsStream == null) {
       _cachedPrefsStreamUserId = uid;
       _cachedPrefsStream = _db.collection(_collection).doc(uid).snapshots().map((doc) {
-        if (!doc.exists || doc.data() == null) return null;
+        if (!doc.exists || doc.data() == null) {
+          _latestPreferencesSnapshot = null;
+          return null;
+        }
         final prefs = UserPreferencesModel.fromMap(doc.data()!, doc.id);
+        _latestPreferencesSnapshot = prefs;
         if (_optimisticTheme != null && prefs.theme == _optimisticTheme) {
           _optimisticTheme = null;
         }
@@ -59,8 +70,13 @@ class UserPreferencesViewModel extends ChangeNotifier {
     if (uid == null || uid.isEmpty) return null;
     try {
       final doc = await _db.collection(_collection).doc(uid).get();
-      if (!doc.exists || doc.data() == null) return null;
-      return UserPreferencesModel.fromMap(doc.data()!, doc.id);
+      if (!doc.exists || doc.data() == null) {
+        _latestPreferencesSnapshot = null;
+        return null;
+      }
+      final prefs = UserPreferencesModel.fromMap(doc.data()!, doc.id);
+      _latestPreferencesSnapshot = prefs;
+      return prefs;
     } catch (e) {
       debugPrint('UserPreferencesViewModel fetchPreferences: $e');
       return null;
@@ -69,19 +85,27 @@ class UserPreferencesViewModel extends ChangeNotifier {
 
   /// Ensure the user has a preferences document. Creates one with defaults if missing.
   /// Call after login so subsequent fetch/stream return a doc.
+  ///
+  /// Uses a transaction so we never overwrite a doc created by a concurrent [update]
+  /// (the old get-then-set pattern could replace the whole document and wipe fields).
   Future<void> ensureDefaults() async {
     final uid = _userId;
     if (uid == null || uid.isEmpty) return;
     try {
       final ref = _db.collection(_collection).doc(uid);
-      final doc = await ref.get();
-      if (!doc.exists || doc.data() == null) {
+      var created = false;
+      await _db.runTransaction((transaction) async {
+        final snap = await transaction.get(ref);
+        if (snap.exists && snap.data() != null) return;
         final now = DateTime.now();
         final defaults = UserPreferencesModel(
           userId: uid,
           updatedAt: now,
         );
-        await ref.set(defaults.toMap());
+        transaction.set(ref, defaults.toMap());
+        created = true;
+      });
+      if (created) {
         debugPrint('UserPreferencesViewModel: created default prefs for user $uid');
       }
     } catch (e) {
@@ -92,9 +116,12 @@ class UserPreferencesViewModel extends ChangeNotifier {
   /// Update one or more preference fields. Merges with existing doc.
   Future<void> update(Map<String, dynamic> fields) async {
     final uid = _userId;
-    if (uid == null || uid.isEmpty) return;
+    if (uid == null || uid.isEmpty) {
+      throw StateError('Cannot save preferences: not signed in.');
+    }
     try {
       final updateData = Map<String, dynamic>.from(fields)
+        ..['user_id'] = uid
         ..['updated_at'] = Timestamp.fromDate(DateTime.now());
       await _db.collection(_collection).doc(uid).set(updateData, SetOptions(merge: true));
       notifyListeners();
@@ -115,20 +142,6 @@ class UserPreferencesViewModel extends ChangeNotifier {
     });
   }
 
-  /// Update Focus Timer preferences.
-  Future<void> updateFocusTimerPreferences({
-    String? defaultTimerId,
-    bool? timerSoundEnabled,
-    bool? timerVibrationEnabled,
-  }) async {
-    final map = <String, dynamic>{};
-    if (defaultTimerId != null) map['default_timer_id'] = defaultTimerId;
-    if (timerSoundEnabled != null) map['timer_sound_enabled'] = timerSoundEnabled;
-    if (timerVibrationEnabled != null) map['timer_vibration_enabled'] = timerVibrationEnabled;
-    if (map.isEmpty) return;
-    await update(map);
-  }
-
   /// Update theme (applies optimistically, then persists to Firestore).
   Future<void> updateTheme(String theme) async {
     _optimisticTheme = theme;
@@ -142,26 +155,4 @@ class UserPreferencesViewModel extends ChangeNotifier {
     }
   }
 
-  /// Update reminder preferences.
-  Future<void> updateReminderPreferences({
-    bool? remindersEnabled,
-    int? defaultReminderMinutesBefore,
-    int? quietHoursStartMinutes,
-    int? quietHoursEndMinutes,
-  }) async {
-    final map = <String, dynamic>{};
-    if (remindersEnabled != null) map['reminders_enabled'] = remindersEnabled;
-    if (defaultReminderMinutesBefore != null) {
-      map['default_reminder_minutes_before'] = defaultReminderMinutesBefore;
-    }
-    if (quietHoursStartMinutes != null) map['quiet_hours_start_minutes'] = quietHoursStartMinutes;
-    if (quietHoursEndMinutes != null) map['quiet_hours_end_minutes'] = quietHoursEndMinutes;
-    if (map.isEmpty) return;
-    await update(map);
-  }
-
-  /// Update week start (1 = Monday, 7 = Sunday).
-  Future<void> updateWeekStartsOn(int weekStartsOn) async {
-    await update({'week_starts_on': weekStartsOn});
-  }
 }

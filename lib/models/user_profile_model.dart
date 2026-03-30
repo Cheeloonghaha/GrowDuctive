@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// App user profile – extended data stored in Firestore.
+/// App user profile – extended data stored in Firestore `users/{uid}`.
 /// Auth identity (email, password) is in Firebase Auth; this model holds
-/// profile-only fields. Do not store password_hash – Firebase Auth handles passwords.
+/// display fields only. App preference settings are stored separately
+/// (`user_preferences` collection, see `user_preferences_model.dart`).
 class UserProfileModel {
   /// Same as Firebase Auth UID (document id in `users` collection).
   final String id;

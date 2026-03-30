@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/task_viewmodel.dart';
 import '../viewmodels/scheduled_task_viewmodel.dart';
-import '../viewmodels/user_preferences_viewmodel.dart';
 import '../models/task_model.dart';
 import '../models/category_model.dart';
 import '../models/user_preferences_model.dart';
@@ -14,14 +13,17 @@ import '../theme/growductive_chrome.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_section_header.dart';
 import '../widgets/calendar_week_strip.dart';
-import '../widgets/glass_sheet.dart';
+import '../widgets/add_task_bottom_sheet.dart';
+import '../widgets/edit_task_bottom_sheet.dart';
 import '../navigation/sidebar_drawer_controller.dart';
 
-/// Duration in minutes between [start] and [end] (end - start). Assumes same day.
-int _minutesBetween(TimeOfDay start, TimeOfDay end) {
-  final startM = start.hour * 60 + start.minute;
-  final endM = end.hour * 60 + end.minute;
-  return endM - startM;
+/// Darkens a category [pastel] for borders while keeping the same hue (pink vs green vs purple).
+Color _darkerCategoryBorderColor(Color pastel, {required bool isDark}) {
+  final hsv = HSVColor.fromColor(pastel);
+  final factor = isDark ? 0.62 : 0.44;
+  return hsv
+      .withValue((hsv.value * factor).clamp(0.24, 0.88))
+      .toColor();
 }
 
 class TaskScreen extends StatefulWidget {
@@ -45,28 +47,19 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   // Cache streams so setState() (e.g. changing _selectedDate) doesn't recreate
   // Firestore listeners on every rebuild.
   String? _cachedTaskUserId;
-  String? _cachedPrefsUserId;
   Stream<List<TaskModel>>? _tasksStream;
   Stream<List<CategoryModel>>? _categoriesStream;
-  Stream<UserPreferencesModel?>? _preferencesStream;
 
   @override
   Widget build(BuildContext context) {
     final taskVM = Provider.of<TaskViewModel>(context, listen: false);
-    final prefsVM = Provider.of<UserPreferencesViewModel>(context, listen: false);
-
     final taskUid = taskVM.userId;
-    final prefsUid = prefsVM.userId;
     if (_tasksStream == null ||
         _categoriesStream == null ||
-        _preferencesStream == null ||
-        _cachedTaskUserId != taskUid ||
-        _cachedPrefsUserId != prefsUid) {
+        _cachedTaskUserId != taskUid) {
       _cachedTaskUserId = taskUid;
-      _cachedPrefsUserId = prefsUid;
       _tasksStream = taskVM.tasksStream;
       _categoriesStream = taskVM.categoriesStream;
-      _preferencesStream = prefsVM.preferencesStream;
     }
 
     final baseTheme = Theme.of(context);
@@ -262,13 +255,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
 
   // ==================== BODY ====================
   Widget _buildBody(TaskViewModel taskVM) {
-    return StreamBuilder<UserPreferencesModel?>(
-      stream: _preferencesStream,
-      builder: (context, prefSnap) {
-        final weekStartsOn =
-            prefSnap.data?.weekStartsOn ?? UserPreferencesModel.weekMonday;
+    const weekStartsOn = UserPreferencesModel.weekMonday;
 
-        return StreamBuilder<List<TaskModel>>(
+    return StreamBuilder<List<TaskModel>>(
           stream: _tasksStream,
           builder: (context, taskSnapshot) {
             if (taskSnapshot.hasError) {
@@ -502,8 +491,6 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
             );
           },
         );
-      },
-    );
   }
 
   Widget _buildTaskListSegmentControl() {
@@ -972,6 +959,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         : (isDark
             ? scheme.outline.withValues(alpha: 0.38)
             : AppColors.borderSubtle);
+    final accentStrip = task.overdue
+        ? AppColors.coral
+        : _darkerCategoryBorderColor(pastel, isDark: isDark);
 
     return Material(
       color: Colors.transparent,
@@ -990,7 +980,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: cardBorder,
-              width: task.overdue ? 2 : 1,
+              width: 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -1000,12 +990,27 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
             children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 3,
+                  color: accentStrip,
+                ),
+              ),
               Padding(
-                padding: EdgeInsets.fromLTRB(pad, pad, pad, 6),
-                child: Row(
+                padding: const EdgeInsets.only(left: 3),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(pad, pad, pad, 6),
+                      child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
@@ -1108,7 +1113,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     // Urgency
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: urgencyAccent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
@@ -1116,12 +1121,12 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.flag_rounded, size: 12, color: urgencyAccent),
-                          const SizedBox(width: 4),
+                          Icon(Icons.flag_rounded, size: 11, color: urgencyAccent),
+                          const SizedBox(width: 3),
                           Text(
                             'U${task.urgency}',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: urgencyAccent,
                             ),
@@ -1131,7 +1136,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     // Importance
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: importanceAccent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
@@ -1139,12 +1144,12 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.star_rounded, size: 12, color: importanceAccent),
-                          const SizedBox(width: 4),
+                          Icon(Icons.star_rounded, size: 11, color: importanceAccent),
+                          const SizedBox(width: 3),
                           Text(
                             'I${task.importance}',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: importanceAccent,
                             ),
@@ -1154,7 +1159,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     // Duration
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(20),
@@ -1167,14 +1172,14 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         children: [
                           Icon(
                             Icons.schedule_rounded,
-                            size: 13,
+                            size: 11,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 3),
                           Text(
                             '${task.duration} min',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -1182,6 +1187,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
                   ],
                 ),
               ),
@@ -1204,11 +1212,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    // Category-accent color used across border + stripe.
-    final borderColor = Color.alphaBlend(
-      (isDark ? Colors.white : Colors.black).withValues(alpha: 0.22),
-      categoryPastel,
-    );
+    // Same hue as category chip, darkened so the modal outline reads clearly.
+    final borderColor = _darkerCategoryBorderColor(categoryPastel, isDark: isDark);
     final titleColor = scheme.onSurface;
     final bodyColor = scheme.onSurface.withValues(alpha: 0.72);
 
@@ -1223,7 +1228,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -1369,8 +1374,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
 
                             // Metrics
                             Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 _buildDetailMetric(
                                   context,
@@ -1516,28 +1521,28 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }) {
     final scheme = Theme.of(context).colorScheme;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 110),
+      constraints: const BoxConstraints(minWidth: 88),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: accent.withValues(alpha: 0.22)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 color: accent.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
-              child: Icon(icon, size: 18, color: accent),
+              child: Icon(icon, size: 15, color: accent),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -1545,17 +1550,17 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: scheme.onSurface,
                     height: 1.0,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: scheme.onSurface.withValues(alpha: 0.65),
                     height: 1.0,
@@ -1571,211 +1576,38 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
 
 
 
-  // Confirm delete dialog - Redesigned to match consistent design
+  // Confirm delete dialog — header/snackbar match app chrome (nav blue).
   void _confirmDelete(BuildContext context, TaskViewModel vm, TaskModel task) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete_outline, color: Colors.white, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        "Delete Task",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
-                    ),
-                  ],
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.red[600], size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Are you sure you want to delete '${task.title}'?",
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: Colors.grey[800],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "This action cannot be undone.",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Actions
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.grey[400]!),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          ),
-                          child: Text(
-                            "Cancel",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final dialogContext = context;
-                            final prefs = await Provider.of<UserPreferencesViewModel>(dialogContext, listen: false)
-                                .fetchPreferences();
-                            try {
-                              await vm.deleteTask(task.id, userPrefs: prefs);
-                              if (!dialogContext.mounted) return;
-                              Navigator.pop(dialogContext);
-                              if (!dialogContext.mounted) return;
-                              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Task deleted'),
-                                  backgroundColor: Colors.black,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            } catch (e) {
-                              if (!dialogContext.mounted) return;
-                              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                SnackBar(
-                                  content: Text('Could not delete task: $e'),
-                                  backgroundColor: Colors.red.shade700,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red[600],
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          ),
-                          child: const Text(
-                            "Delete",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Show dialog to edit task - Redesigned to match Add Task dialog
-  void _showEditTaskDialog(BuildContext parentContext, TaskViewModel vm, TaskModel task) {
-    final navigator = Navigator.of(parentContext);
-    final messenger = ScaffoldMessenger.of(parentContext);
-    final scheduledVM = Provider.of<ScheduledTaskViewModel>(parentContext, listen: false);
-
-    final titleController = TextEditingController(text: task.title);
-    final descriptionController = TextEditingController(text: task.description);
-    final int initialDuration = (task.startTime != null && task.endTime != null && task.endTime! > task.startTime!)
-        ? (task.endTime! - task.startTime!)
-        : task.duration;
-    final durationController = TextEditingController(text: initialDuration.toString());
-    int urgency = task.urgency;
-    int importance = task.importance;
-    String selectedCategoryId = task.categoryId;
-    TimeOfDay? startTimeOfDay = task.startTime != null
-        ? TimeOfDay(hour: task.startTime! ~/ 60, minute: task.startTime! % 60)
-        : null;
-    TimeOfDay? endTimeOfDay = task.endTime != null
-        ? TimeOfDay(hour: task.endTime! ~/ 60, minute: task.endTime! % 60)
-        : null;
-    String? editDialogError;
-
-    showDialog(
-      context: parentContext,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => Dialog(
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        final chrome = dialogContext.chrome;
+        final navBlue = chrome.navBlue;
+        return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    color: navBlue,
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.edit, color: Colors.white, size: 24),
+                      const Icon(Icons.delete_outline, color: Colors.white, size: 24),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          "Edit Task",
+                          'Delete Task',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -1790,492 +1622,101 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ],
                   ),
                 ),
-                
-                // Content
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Task Title
-                        TextField(
-                          controller: titleController,
-                          decoration: InputDecoration(
-                            labelText: "Task Title",
-                            hintText: "Enter task title",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.black, width: 2),
-                            ),
-                          ),
-                          autofocus: true,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Description
-                        TextField(
-                          controller: descriptionController,
-                          decoration: InputDecoration(
-                            labelText: "Description (Optional)",
-                            hintText: "Enter task description",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.black, width: 2),
-                            ),
-                          ),
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Duration
-                        TextField(
-                          controller: durationController,
-                          onChanged: (_) => setState(() => editDialogError = null),
-                          decoration: InputDecoration(
-                            labelText: "Duration (minutes)",
-                            hintText: "e.g., 30",
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.black, width: 2),
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Start time (optional)
-                        InkWell(
-                          onTap: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: startTimeOfDay ?? const TimeOfDay(hour: 9, minute: 0),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                editDialogError = null;
-                                startTimeOfDay = picked;
-                                if (endTimeOfDay != null) {
-                                  final mins = _minutesBetween(picked, endTimeOfDay!);
-                                  if (mins > 0) durationController.text = mins.toString();
-                                }
-                              });
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: "Start time (optional)",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Colors.black, width: 2),
-                              ),
-                            ),
-                            child: Text(
-                              startTimeOfDay != null
-                                  ? startTimeOfDay!.format(context)
-                                  : "Not set",
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: startTimeOfDay != null ? Colors.black87 : Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (startTimeOfDay != null) ...[
-                          const SizedBox(height: 4),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  startTimeOfDay = null;
-                                  // When clearing start time, we no longer auto-sync duration from times
-                                  // so leave durationController as-is.
-                                });
-                              },
-                              child: const Text('Clear start time'),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-
-                        // End time (optional)
-                        InkWell(
-                          onTap: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: endTimeOfDay ?? startTimeOfDay ?? const TimeOfDay(hour: 10, minute: 0),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                editDialogError = null;
-                                endTimeOfDay = picked;
-                                if (startTimeOfDay != null) {
-                                  final mins = _minutesBetween(startTimeOfDay!, picked);
-                                  if (mins > 0) durationController.text = mins.toString();
-                                }
-                              });
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: "End time (optional)",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Colors.black, width: 2),
-                              ),
-                            ),
-                            child: Text(
-                              endTimeOfDay != null
-                                  ? endTimeOfDay!.format(context)
-                                  : "Not set",
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: endTimeOfDay != null ? Colors.black87 : Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (endTimeOfDay != null) ...[
-                          const SizedBox(height: 4),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  endTimeOfDay = null;
-                                  // When clearing end time, keep duration as typed.
-                                });
-                              },
-                              child: const Text('Clear end time'),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 20),
-
-                        // Category Dropdown
-                        StreamBuilder<List<CategoryModel>>(
-                          stream: vm.categoriesStream,
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const CircularProgressIndicator();
-                            }
-                            final categories = snapshot.data!;
-                            return DropdownButtonFormField<String>(
-                              value: selectedCategoryId.isEmpty ? null : selectedCategoryId,
-                              decoration: InputDecoration(
-                                labelText: "Category",
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(color: Colors.grey[300]!),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Colors.black, width: 2),
-                                ),
-                              ),
-                              items: categories.map((category) {
-                                return DropdownMenuItem<String>(
-                                  value: category.id,
-                                  child: Text(category.name),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedCategoryId = value ?? '';
-                                });
-                              },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Urgency Slider
-                        Text(
-                          "Urgency Level",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderThemeData(
-                                  activeTrackColor: Colors.black,
-                                  inactiveTrackColor: Colors.grey[300],
-                                  thumbColor: Colors.black,
-                                  overlayColor: Colors.black.withOpacity(0.1),
-                                ),
-                                child: Slider(
-                                  value: urgency.toDouble(),
-                                  min: 1,
-                                  max: 5,
-                                  divisions: 4,
-                                  label: urgency.toString(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      urgency = value.toInt();
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  urgency.toString(),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Importance Slider
-                        Text(
-                          "Importance Level",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderThemeData(
-                                  activeTrackColor: Colors.black,
-                                  inactiveTrackColor: Colors.grey[300],
-                                  thumbColor: Colors.black,
-                                  overlayColor: Colors.black.withOpacity(0.1),
-                                ),
-                                child: Slider(
-                                  value: importance.toDouble(),
-                                  min: 1,
-                                  max: 5,
-                                  divisions: 4,
-                                  label: importance.toString(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      importance = value.toInt();
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  importance.toString(),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (editDialogError != null) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.red.shade200),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 22),
-                          const SizedBox(width: 10),
+                          Icon(Icons.warning_amber_rounded, color: AppColors.coral, size: 20),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              editDialogError!,
+                              "Are you sure you want to delete '${task.title}'?",
                               style: TextStyle(
-                                color: Colors.red.shade800,
-                                fontSize: 14,
+                                fontSize: 15,
+                                color: scheme.onSurface,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
-                // Action Buttons
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: Colors.grey[400]!),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            "Cancel",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'This action cannot be undone.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            if (titleController.text.trim().isEmpty || selectedCategoryId.isEmpty) {
-                              String errorMsg = "Please enter a task title";
-                              if (selectedCategoryId.isEmpty) {
-                                errorMsg = "Please select a category";
-                              }
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(errorMsg),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            final startM = startTimeOfDay != null
-                                ? startTimeOfDay!.hour * 60 + startTimeOfDay!.minute
-                                : null;
-                            final endM = endTimeOfDay != null
-                                ? endTimeOfDay!.hour * 60 + endTimeOfDay!.minute
-                                : null;
-                            if (startM != null && endM != null) {
-                              if (endM <= startM) {
-                                setState(() => editDialogError = 'End time must be after start time.');
-                                return;
-                              }
-                              final durationMins = int.tryParse(durationController.text);
-                              final expectedDuration = endM - startM;
-                              if (durationMins == null || durationMins != expectedDuration) {
-                                setState(() => editDialogError =
-                                    'Duration must match start–end time ($expectedDuration min). Adjust times or duration.');
-                                return;
-                              }
-                            }
-                            await vm.updateTask(
-                              id: task.id,
-                              title: titleController.text.trim(),
-                              description: descriptionController.text.trim(),
-                              urgency: urgency,
-                              importance: importance,
-                              duration: int.tryParse(durationController.text) ?? 30,
-                              categoryId: selectedCategoryId,
-                              startTime: startM,
-                              endTime: endM,
-                            );
-                            if (startM != null && endM != null) {
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: navBlue.withValues(alpha: 0.45)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: navBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () async {
                               try {
-                                await scheduledVM.updateOrCreateScheduledTasksForTask(
-                                  taskId: task.id,
-                                  startTimeMinutes: startM,
-                                  endTimeMinutes: endM,
-                                  scheduleDate: task.taskDate,
-                                  taskName: titleController.text.trim(),
+                                await vm.deleteTask(task.id);
+                                if (!dialogContext.mounted) return;
+                                Navigator.pop(dialogContext);
+                                if (!dialogContext.mounted) return;
+                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Task deleted'),
+                                    backgroundColor: navBlue,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
                                 );
                               } catch (e) {
-                                messenger.showSnackBar(
+                                if (!dialogContext.mounted) return;
+                                ScaffoldMessenger.of(dialogContext).showSnackBar(
                                   SnackBar(
-                                    content: Text('Task updated; calendar sync failed: $e'),
-                                    backgroundColor: Colors.orange,
+                                    content: Text('Could not delete task: $e'),
+                                    backgroundColor: Colors.red.shade700,
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               }
-                            }
-                            navigator.pop();
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: const Text("Task updated successfully!"),
-                                backgroundColor: Colors.black,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.coral,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            ),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                          child: const Text(
-                            "Update Task",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -2283,810 +1724,35 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  /// Grouped “bento” block inside the add-task sheet (spacing + soft glass card).
-  Widget _buildAddTaskSheetSection({
-    required BuildContext context,
-    required String title,
-    String? subtitle,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = scheme.brightness == Brightness.dark;
-    final cardFill = isDark
-        ? scheme.surfaceContainerHighest.withValues(alpha: 0.92)
-        : Colors.white.withValues(alpha: 0.52);
-    final cardBorder = isDark
-        ? scheme.outline.withValues(alpha: 0.42)
-        : Colors.white.withValues(alpha: 0.72);
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        color: cardFill,
-        border: Border.all(color: cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: AppColors.interactive.withValues(alpha: isDark ? 0.22 : 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, size: 20, color: AppColors.interactive),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    if (subtitle != null && subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.35,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  /// Add task in a glassmorphism bottom sheet (blur + frosted panel).
-  void _showAddTaskDialog(BuildContext context, TaskViewModel vm) {
-    final taskScreen = this;
-    final pageContext = context;
-    final messenger = ScaffoldMessenger.of(context);
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final durationController = TextEditingController(text: '30');
-    int urgency = 3;
-    int importance = 3;
-    String? selectedCategoryId;
-    TimeOfDay? startTimeOfDay;
-    TimeOfDay? endTimeOfDay;
-    String? addDialogError;
-    var taskDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (sheetContext) {
-        final viewInsets = MediaQuery.viewInsetsOf(sheetContext);
-        final maxH = (MediaQuery.sizeOf(sheetContext).height * 0.92 - viewInsets.bottom).clamp(280.0, 900.0);
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: viewInsets.bottom),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: GlassSheet(
-              blurSigma: 18,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxH),
-                child: StatefulBuilder(
-                  builder: (context, setSheetState) {
-                    final theme = Theme.of(context);
-                    final scheme = theme.colorScheme;
-                    final isDark = theme.brightness == Brightness.dark;
-                    final borderRadius = BorderRadius.circular(14);
-                    final borderColor =
-                        isDark ? scheme.outline.withValues(alpha: 0.55) : AppColors.borderSubtle;
-                    final outlineBorder = OutlineInputBorder(
-                      borderRadius: borderRadius,
-                      borderSide: BorderSide(color: borderColor),
-                    );
-                    final focusBorder = OutlineInputBorder(
-                      borderRadius: borderRadius,
-                      borderSide: BorderSide(color: scheme.primary, width: 2),
-                    );
-                    final fieldFill = isDark
-                        ? scheme.surfaceContainerHighest
-                        : Colors.white.withValues(alpha: 0.78);
-                    final fieldTextStyle = TextStyle(color: scheme.onSurface, fontSize: 16);
-                    final labelStyle = TextStyle(color: scheme.onSurfaceVariant);
-                    final hintStyle =
-                        TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.75));
-                    final compactDeco = InputDecoration(
-                      filled: true,
-                      fillColor: fieldFill,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      border: outlineBorder,
-                      enabledBorder: outlineBorder,
-                      focusedBorder: focusBorder,
-                      labelStyle: labelStyle,
-                      floatingLabelStyle: labelStyle,
-                      hintStyle: hintStyle,
-                    );
-                    final inactiveSlider = isDark
-                        ? scheme.outline.withValues(alpha: 0.35)
-                        : AppColors.borderSubtle;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(20, 18, 12, 18),
-                          decoration: const BoxDecoration(
-                            color: AppColors.interactive,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.add_task_rounded, color: Colors.white, size: 26),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      'Add New Task',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                    Text(
-                                      'A few quick sections — scroll if needed',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        height: 1.25,
-                                        color: Colors.white.withValues(alpha: 0.88),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => Navigator.pop(sheetContext),
-                                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
-                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildAddTaskSheetSection(
-                                  context: context,
-                                  title: 'About',
-                                  subtitle: 'Title is required. Description is optional.',
-                                  icon: Icons.edit_note_rounded,
-                                  children: [
-                                    TextField(
-                                      controller: titleController,
-                                      style: fieldTextStyle,
-                                      decoration: compactDeco.copyWith(
-                                        labelText: 'Task title',
-                                        hintText: 'What do you need to do?',
-                                      ),
-                                      autofocus: true,
-                                      textInputAction: TextInputAction.next,
-                                    ),
-                                    const SizedBox(height: 14),
-                                    TextField(
-                                      controller: descriptionController,
-                                      style: fieldTextStyle,
-                                      decoration: compactDeco.copyWith(
-                                        labelText: 'Notes',
-                                        hintText: 'Extra context (optional)',
-                                        alignLabelWithHint: true,
-                                      ),
-                                      minLines: 2,
-                                      maxLines: 4,
-                                    ),
-                                  ],
-                                ),
-                                _buildAddTaskSheetSection(
-                                  context: context,
-                                  title: 'Schedule',
-                                  subtitle:
-                                      'Choose the day and how long it takes. Set both start and end time to place it on your calendar.',
-                                  icon: Icons.event_available_rounded,
-                                  children: [
-                                    Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        onTap: () async {
-                                          final picked = await showDatePicker(
-                                            context: sheetContext,
-                                            initialDate: taskDate,
-                                            firstDate: DateTime(2020),
-                                            lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
-                                          );
-                                          if (picked != null) {
-                                            setSheetState(() {
-                                              addDialogError = null;
-                                              taskDate = DateTime(picked.year, picked.month, picked.day);
-                                            });
-                                          }
-                                        },
-                                        borderRadius: BorderRadius.circular(14),
-                                        child: InputDecorator(
-                                          decoration: compactDeco.copyWith(
-                                            labelText: 'Task date',
-                                            prefixIcon: Icon(
-                                              Icons.calendar_today_outlined,
-                                              size: 22,
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            MaterialLocalizations.of(context).formatFullDate(taskDate),
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: scheme.onSurface,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-                                    TextField(
-                                      controller: durationController,
-                                      onChanged: (_) => setSheetState(() => addDialogError = null),
-                                      style: fieldTextStyle,
-                                      decoration: compactDeco.copyWith(
-                                        labelText: 'Duration',
-                                        hintText: 'Minutes',
-                                        suffixText: 'min',
-                                        suffixStyle: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          color: scheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                      keyboardType: TextInputType.number,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: InkWell(
-                                              onTap: () async {
-                                                final picked = await showTimePicker(
-                                                  context: context,
-                                                  initialTime: startTimeOfDay ?? const TimeOfDay(hour: 9, minute: 0),
-                                                );
-                                                if (picked != null) {
-                                                  setSheetState(() {
-                                                    addDialogError = null;
-                                                    startTimeOfDay = picked;
-                                                    if (endTimeOfDay != null) {
-                                                      final mins = _minutesBetween(picked, endTimeOfDay!);
-                                                      if (mins > 0) durationController.text = mins.toString();
-                                                    }
-                                                  });
-                                                }
-                                              },
-                                              borderRadius: BorderRadius.circular(14),
-                                              child: Container(
-                                                width: double.infinity,
-                                                padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-                                                decoration: BoxDecoration(
-                                                  color: fieldFill,
-                                                  borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: borderColor),
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'Start',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w700,
-                                                        letterSpacing: 0.3,
-                                                        color: scheme.onSurfaceVariant,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 6),
-                                                    Text(
-                                                      startTimeOfDay != null
-                                                          ? startTimeOfDay!.format(context)
-                                                          : 'Tap to set',
-                                                      style: TextStyle(
-                                                        fontSize: 15,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: startTimeOfDay != null
-                                                            ? scheme.onSurface
-                                                            : scheme.onSurfaceVariant,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: InkWell(
-                                              onTap: () async {
-                                                final picked = await showTimePicker(
-                                                  context: context,
-                                                  initialTime: endTimeOfDay ??
-                                                      startTimeOfDay ??
-                                                      const TimeOfDay(hour: 10, minute: 0),
-                                                );
-                                                if (picked != null) {
-                                                  setSheetState(() {
-                                                    addDialogError = null;
-                                                    endTimeOfDay = picked;
-                                                    if (startTimeOfDay != null) {
-                                                      final mins = _minutesBetween(startTimeOfDay!, picked);
-                                                      if (mins > 0) durationController.text = mins.toString();
-                                                    }
-                                                  });
-                                                }
-                                              },
-                                              borderRadius: BorderRadius.circular(14),
-                                              child: Container(
-                                                width: double.infinity,
-                                                padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-                                                decoration: BoxDecoration(
-                                                  color: fieldFill,
-                                                  borderRadius: BorderRadius.circular(14),
-                                                  border: Border.all(color: borderColor),
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'End',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w700,
-                                                        letterSpacing: 0.3,
-                                                        color: scheme.onSurfaceVariant,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 6),
-                                                    Text(
-                                                      endTimeOfDay != null
-                                                          ? endTimeOfDay!.format(context)
-                                                          : 'Tap to set',
-                                                      style: TextStyle(
-                                                        fontSize: 15,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: endTimeOfDay != null
-                                                            ? scheme.onSurface
-                                                            : scheme.onSurfaceVariant,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (startTimeOfDay != null || endTimeOfDay != null) ...[
-                                      const SizedBox(height: 8),
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: TextButton(
-                                          onPressed: () => setSheetState(() {
-                                            startTimeOfDay = null;
-                                            endTimeOfDay = null;
-                                          }),
-                                          child: const Text('Clear times'),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                _buildAddTaskSheetSection(
-                                  context: context,
-                                  title: 'Category',
-                                  subtitle: 'Organize tasks by area of life.',
-                                  icon: Icons.folder_outlined,
-                                  children: [
-                                    StreamBuilder<List<CategoryModel>>(
-                                      stream: vm.categoriesStream,
-                                      builder: (context, snapshot) {
-                                        if (!snapshot.hasData) {
-                                          return const Center(
-                                            child: Padding(
-                                              padding: EdgeInsets.symmetric(vertical: 20),
-                                              child: CircularProgressIndicator(color: AppColors.interactive),
-                                            ),
-                                          );
-                                        }
-                                        final categories = snapshot.data!;
-                                        return DropdownButtonFormField<String>(
-                                          // ignore: deprecated_member_use
-                                          value: selectedCategoryId,
-                                          dropdownColor: scheme.surfaceContainerHigh,
-                                          style: fieldTextStyle,
-                                          iconEnabledColor: scheme.onSurfaceVariant,
-                                          decoration: compactDeco.copyWith(labelText: 'Select category'),
-                                          items: categories.map((category) {
-                                            return DropdownMenuItem<String>(
-                                              value: category.id,
-                                              child: Text(
-                                                category.name,
-                                                style: TextStyle(color: scheme.onSurface),
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (value) {
-                                            setSheetState(() => selectedCategoryId = value);
-                                          },
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                                _buildAddTaskSheetSection(
-                                  context: context,
-                                  title: 'Priority',
-                                  subtitle: 'Adjust if this task should stand out in your list.',
-                                  icon: Icons.bolt_rounded,
-                                  children: [
-                                    Text(
-                                      'Urgency',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                        color: scheme.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: SliderTheme(
-                                            data: SliderThemeData(
-                                              activeTrackColor: AppColors.interactive,
-                                              inactiveTrackColor: inactiveSlider,
-                                              thumbColor: AppColors.interactive,
-                                              overlayColor: AppColors.interactive.withValues(alpha: 0.12),
-                                              trackHeight: 4,
-                                            ),
-                                            child: Slider(
-                                              value: urgency.toDouble(),
-                                              min: 1,
-                                              max: 5,
-                                              divisions: 4,
-                                              label: urgency.toString(),
-                                              onChanged: (value) =>
-                                                  setSheetState(() => urgency = value.toInt()),
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 44,
-                                          height: 44,
-                                          decoration: BoxDecoration(
-                                            color: fieldFill,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: borderColor),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            '$urgency',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 18,
-                                              color: scheme.onSurface,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 18),
-                                    Text(
-                                      'Importance',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                        color: scheme.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: SliderTheme(
-                                            data: SliderThemeData(
-                                              activeTrackColor: AppColors.jade,
-                                              inactiveTrackColor: inactiveSlider,
-                                              thumbColor: AppColors.jade,
-                                              overlayColor: AppColors.jade.withValues(alpha: 0.12),
-                                              trackHeight: 4,
-                                            ),
-                                            child: Slider(
-                                              value: importance.toDouble(),
-                                              min: 1,
-                                              max: 5,
-                                              divisions: 4,
-                                              label: importance.toString(),
-                                              onChanged: (value) =>
-                                                  setSheetState(() => importance = value.toInt()),
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          width: 44,
-                                          height: 44,
-                                          decoration: BoxDecoration(
-                                            color: fieldFill,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: borderColor),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            '$importance',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 18,
-                                              color: scheme.onSurface,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(
-                                color: isDark
-                                    ? scheme.outline.withValues(alpha: 0.4)
-                                    : Colors.white.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            color: isDark
-                                ? scheme.surfaceContainerHigh.withValues(alpha: 0.88)
-                                : Colors.white.withValues(alpha: 0.28),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                        if (addDialogError != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.coral.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.coral.withValues(alpha: 0.35)),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.warning_amber_rounded, color: AppColors.coral, size: 22),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      addDialogError!,
-                                      style: TextStyle(
-                                        color: scheme.error,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                              SafeArea(
-                                top: false,
-                                minimum: const EdgeInsets.only(bottom: 8),
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: () => Navigator.pop(sheetContext),
-                                          style: OutlinedButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            side: BorderSide(color: borderColor),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                          ),
-                                          child: Text(
-                                            'Cancel',
-                                            style: TextStyle(
-                                              color: scheme.onSurface,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                  onPressed: () async {
-                                    if (titleController.text.trim().isEmpty || selectedCategoryId == null) {
-                                      var errorMsg = 'Please enter a task title';
-                                      if (selectedCategoryId == null) errorMsg = 'Please select a category';
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(errorMsg),
-                                          backgroundColor: AppColors.coral,
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    final int? startM = startTimeOfDay != null
-                                        ? startTimeOfDay!.hour * 60 + startTimeOfDay!.minute
-                                        : null;
-                                    final int? endM = endTimeOfDay != null
-                                        ? endTimeOfDay!.hour * 60 + endTimeOfDay!.minute
-                                        : null;
-                                    if (startM != null && endM != null) {
-                                      if (endM <= startM) {
-                                        setSheetState(() => addDialogError = 'End time must be after start time.');
-                                        return;
-                                      }
-                                      final durationMins = int.tryParse(durationController.text);
-                                      final expectedDuration = endM - startM;
-                                      if (durationMins == null || durationMins != expectedDuration) {
-                                        setSheetState(() => addDialogError =
-                                            'Duration must match start–end time ($expectedDuration min). Set start and end time again or adjust duration.');
-                                        return;
-                                      }
-                                    }
-                                    final duration = int.tryParse(durationController.text) ?? 30;
-                                    final taskDay = DateTime(
-                                      taskDate.year,
-                                      taskDate.month,
-                                      taskDate.day,
-                                    );
-                                    final navigator = Navigator.of(sheetContext);
-                                    final scheduledVM = Provider.of<ScheduledTaskViewModel>(sheetContext, listen: false);
-                                    final taskId = await vm.addTask(
-                                      title: titleController.text.trim(),
-                                      description: descriptionController.text.trim(),
-                                      urgency: urgency,
-                                      importance: importance,
-                                      duration: duration,
-                                      categoryId: selectedCategoryId!,
-                                      taskDate: taskDay,
-                                      startTime: startM,
-                                      endTime: endM,
-                                    );
-                                    if (!sheetContext.mounted) return;
-                                    navigator.pop();
-                                    if (!pageContext.mounted) return;
-                                    if (taskId != null && taskScreen.mounted) {
-                                      taskScreen.setState(() {
-                                        _selectedDate = taskDay;
-                                      });
-                                    }
-                                    if (taskId != null && startM != null && endM != null) {
-                                      try {
-                                        await scheduledVM.addScheduledTask(
-                                          taskId: taskId,
-                                          scheduleDate: taskDay,
-                                          startTimeMinutes: startM,
-                                          endTimeMinutes: endM,
-                                          taskName: titleController.text.trim(),
-                                        );
-                                        if (!pageContext.mounted) return;
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: const Text('Task added and added to calendar!'),
-                                            backgroundColor: AppColors.interactive,
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          ),
-                                        );
-                                      } catch (_) {
-                                        if (!pageContext.mounted) return;
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: const Text('Task added (calendar schedule failed).'),
-                                            backgroundColor: AppColors.softGold,
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                      }
-                                    } else {
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: const Text('Task added successfully!'),
-                                          backgroundColor: AppColors.interactive,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.interactive,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  ),
-                                  child: const Text(
-                                    'Add Task',
-                                    style: TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          ),
-                        ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
         );
       },
     );
   }
+
+  void _showEditTaskDialog(BuildContext parentContext, TaskViewModel vm, TaskModel task) {
+    EditTaskBottomSheet.show(
+      parentContext,
+      taskVM: vm,
+      scheduledTaskVM: Provider.of<ScheduledTaskViewModel>(parentContext, listen: false),
+      task: task,
+      onTaskDateChanged: (taskDay) {
+        if (mounted) setState(() => _selectedDate = taskDay);
+      },
+    );
+  }
+
+  void _showAddTaskDialog(BuildContext context, TaskViewModel vm) {
+    AddTaskBottomSheet.show(
+      context,
+      taskVM: vm,
+      scheduledTaskVM: Provider.of<ScheduledTaskViewModel>(context, listen: false),
+      initialTaskDate: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+      onTaskCreated: (taskDay) {
+        if (mounted) setState(() => _selectedDate = taskDay);
+      },
+    );
+  }
+
 
 
 
@@ -3471,156 +2137,161 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Confirm delete category dialog - Redesigned to match consistent design
+  // Confirm delete category dialog — matches task delete (nav blue chrome).
   void _confirmDeleteCategory(BuildContext context, TaskViewModel vm, CategoryModel category) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        final navBlue = dialogContext.chrome.navBlue;
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: navBlue,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Delete Category',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(dialogContext),
+                        child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete_outline, color: Colors.white, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        "Delete Category",
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: AppColors.coral, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Are you sure you want to delete '${category.name}'?",
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: scheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'This action cannot be undone. Categories with existing tasks cannot be deleted.',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
-                    ),
-                  ],
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.red[600], size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Are you sure you want to delete '${category.name}'?",
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: Colors.grey[800],
-                              fontWeight: FontWeight.w500,
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: navBlue.withValues(alpha: 0.45)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: navBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "This action cannot be undone. Categories with existing tasks cannot be deleted.",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () async {
+                              try {
+                                await vm.deleteCategory(category.id);
+                                if (!dialogContext.mounted) return;
+                                Navigator.pop(dialogContext);
+                                if (!dialogContext.mounted) return;
+                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Category deleted'),
+                                    backgroundColor: navBlue,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!dialogContext.mounted) return;
+                                Navigator.pop(dialogContext);
+                                if (!dialogContext.mounted) return;
+                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString()),
+                                    backgroundColor: Colors.red.shade700,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.coral,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            ),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Actions
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.grey[400]!),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          ),
-                          child: Text(
-                            "Cancel",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () async {
-                            try {
-                              await vm.deleteCategory(category.id);
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text("Category deleted"),
-                                  backgroundColor: Colors.black,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            } catch (e) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(e.toString()),
-                                  backgroundColor: Colors.red,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red[600],
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          ),
-                          child: const Text(
-                            "Delete",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -3672,69 +2343,100 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   void _showSortDialog() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.sort, color: Colors.white, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        "Sort Tasks",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        final chrome = dialogContext.chrome;
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: chrome.headerBar,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: chrome.segmentBorder.withValues(alpha: 0.55),
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
-                    ),
-                  ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.sort, color: chrome.navBlue, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Sort Tasks',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: chrome.navBlue,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: Icon(Icons.close, color: chrome.navBlue, size: 24),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              // Sort Options
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  children: [
-                    _buildSortOption('date', 'Date Created', Icons.calendar_today_outlined),
-                    _buildSortOption('priority', 'Priority (U+I)', Icons.bolt_outlined),
-                    _buildSortOption('urgency', 'Urgency', Icons.flag_outlined),
-                    _buildSortOption('importance', 'Importance', Icons.star_outline),
-                    _buildSortOption('duration', 'Duration', Icons.access_time_outlined),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      _buildSortOption(dialogContext, 'date', 'Date Created',
+                          Icons.calendar_today_outlined),
+                      _buildSortOption(dialogContext, 'priority', 'Priority (U+I)',
+                          Icons.bolt_outlined),
+                      _buildSortOption(dialogContext, 'urgency', 'Urgency', Icons.flag_outlined),
+                      _buildSortOption(
+                          dialogContext, 'importance', 'Importance', Icons.star_outline),
+                      _buildSortOption(
+                          dialogContext, 'duration', 'Duration', Icons.access_time_outlined),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   // Build sort option item
-  Widget _buildSortOption(String value, String label, IconData icon) {
+  Widget _buildSortOption(
+    BuildContext context,
+    String value,
+    String label,
+    IconData icon,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     final isSelected = _sortBy == value;
-    
+    final selectedBg = scheme.surfaceContainerHigh;
+    // Dark mode: default Material onSurfaceVariant is often too dim on surface.
+    final unselectedFg =
+        isDark ? scheme.onSurface.withValues(alpha: 0.82) : scheme.onSurfaceVariant;
+    final selectedFg = scheme.onSurface;
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -3744,13 +2446,13 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        color: isSelected ? Colors.grey[100] : Colors.transparent,
+        color: isSelected ? selectedBg : Colors.transparent,
         child: Row(
           children: [
             Icon(
               icon,
               size: 22,
-              color: isSelected ? Colors.black : Colors.grey[600],
+              color: isSelected ? selectedFg : unselectedFg,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -3759,14 +2461,14 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected ? Colors.black : Colors.grey[800],
+                  color: isSelected ? selectedFg : unselectedFg,
                 ),
               ),
             ),
             if (isSelected)
               Icon(
                 Icons.check,
-                color: Colors.black,
+                color: scheme.primary,
                 size: 22,
               ),
           ],

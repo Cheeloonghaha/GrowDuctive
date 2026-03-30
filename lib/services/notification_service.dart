@@ -5,14 +5,15 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../models/user_preferences_model.dart';
-
 class NotificationService {
   NotificationService._();
 
   static final NotificationService instance = NotificationService._();
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+
+  /// Used when a scheduled task has no explicit reminder offsets.
+  static const int kDefaultReminderMinutesBefore = 15;
 
   static const String _channelId = 'task_reminders';
   static const String _channelName = 'Task reminders';
@@ -129,31 +130,30 @@ class NotificationService {
   ///
   /// - [scheduledTaskId] should be the Firestore doc ID for `scheduled_tasks`.
   /// - [scheduleDateOnly] is date-only (time ignored).
-  /// - [startTimeMinutes] is minutes from midnight (0-1439).
+  /// - [startTimeMinutes] / [endTimeMinutes] are minutes from midnight (0-1439).
+  ///   When both are set and valid, the notification body includes the time range (e.g. `09:00–10:00`).
   /// - [offsetsMinutes] are minutes before the start time (e.g. [60, 15]).
   Future<void> scheduleTaskReminders({
     required String scheduledTaskId,
     required String taskTitle,
     required DateTime scheduleDateOnly,
     required int startTimeMinutes,
+    int? endTimeMinutes,
     required List<int> offsetsMinutes,
-    required UserPreferencesModel? prefs,
     bool? remindersEnabledOverride,
   }) async {
     await init();
 
-    final remindersEnabled =
-        remindersEnabledOverride ?? prefs?.remindersEnabled ?? true;
+    final remindersEnabled = remindersEnabledOverride ?? true;
     if (!remindersEnabled) {
       await cancelTaskReminders(
         scheduledTaskId: scheduledTaskId,
         offsetsMinutes: offsetsMinutes,
-        prefs: prefs,
       );
       return;
     }
 
-    final sanitizedOffsets = _effectiveOffsets(offsetsMinutes, prefs);
+    final sanitizedOffsets = _effectiveOffsets(offsetsMinutes);
     if (sanitizedOffsets.isEmpty) {
       if (kDebugMode) {
         debugPrint(
@@ -179,13 +179,6 @@ class NotificationService {
         if (skew <= const Duration(minutes: 2)) {
           // Nudge to a future time to satisfy the plugin constraints.
           final nudged = now.add(const Duration(seconds: 1));
-          if (_isInQuietHours(
-            fireAt: nudged,
-            quietStartMinutes: prefs?.quietHoursStartMinutes,
-            quietEndMinutes: prefs?.quietHoursEndMinutes,
-          )) {
-            continue;
-          }
           if (kDebugMode) {
             debugPrint(
               'NotificationService: offset $offset min → nudge (skew ${skew.inSeconds}s) '
@@ -197,6 +190,8 @@ class NotificationService {
             taskTitle: taskTitle,
             offsetMinutes: offset,
             fireAt: nudged,
+            startTimeMinutes: startTimeMinutes,
+            endTimeMinutes: endTimeMinutes,
           );
           continue;
         }
@@ -204,20 +199,6 @@ class NotificationService {
           debugPrint(
             'NotificationService: offset $offset min SKIPPED (fireAt $fireAt is '
             '${skew.inSeconds}s past; grace is 2 min)',
-          );
-        }
-        continue;
-      }
-
-      // Quiet hours: skip if fire time lands inside quiet hours.
-      if (_isInQuietHours(
-        fireAt: fireAt,
-        quietStartMinutes: prefs?.quietHoursStartMinutes,
-        quietEndMinutes: prefs?.quietHoursEndMinutes,
-      )) {
-        if (kDebugMode) {
-          debugPrint(
-            'NotificationService: offset $offset min SKIPPED (quiet hours) fireAt=$fireAt',
           );
         }
         continue;
@@ -244,7 +225,11 @@ class NotificationService {
       await _zonedScheduleWithFallback(
         id: id,
         title: taskTitle,
-        body: _bodyForOffset(offsetMinutes: offset),
+        body: _notificationBody(
+          offsetMinutes: offset,
+          startTimeMinutes: startTimeMinutes,
+          endTimeMinutes: endTimeMinutes,
+        ),
         scheduledDate: _toTzDateTime(fireAt),
         details: details,
         payload: 'scheduled_task_id=$scheduledTaskId',
@@ -257,6 +242,8 @@ class NotificationService {
     required String taskTitle,
     required int offsetMinutes,
     required DateTime fireAt,
+    required int startTimeMinutes,
+    int? endTimeMinutes,
   }) async {
     final id = _notificationId(scheduledTaskId, offsetMinutes);
 
@@ -273,7 +260,11 @@ class NotificationService {
     await _zonedScheduleWithFallback(
       id: id,
       title: taskTitle,
-      body: _bodyForOffset(offsetMinutes: offsetMinutes),
+      body: _notificationBody(
+        offsetMinutes: offsetMinutes,
+        startTimeMinutes: startTimeMinutes,
+        endTimeMinutes: endTimeMinutes,
+      ),
       scheduledDate: _toTzDateTime(fireAt),
       details: details,
       payload: 'scheduled_task_id=$scheduledTaskId',
@@ -283,21 +274,18 @@ class NotificationService {
   Future<void> cancelTaskReminders({
     required String scheduledTaskId,
     required List<int> offsetsMinutes,
-    required UserPreferencesModel? prefs,
   }) async {
     await init();
-    final sanitizedOffsets = _effectiveOffsets(offsetsMinutes, prefs);
+    final sanitizedOffsets = _effectiveOffsets(offsetsMinutes);
     for (final offset in sanitizedOffsets) {
       await _plugin.cancel(_notificationId(scheduledTaskId, offset));
     }
   }
 
-  List<int> _effectiveOffsets(List<int> offsets, UserPreferencesModel? prefs) {
+  List<int> _effectiveOffsets(List<int> offsets) {
     final sanitized = _sanitizeOffsets(offsets);
     if (sanitized.isNotEmpty) return sanitized;
-    final defaultOffset = prefs?.defaultReminderMinutesBefore;
-    if (defaultOffset == null || defaultOffset <= 0) return const [];
-    return _sanitizeOffsets([defaultOffset]);
+    return _sanitizeOffsets([kDefaultReminderMinutesBefore]);
   }
 
   List<int> _sanitizeOffsets(List<int> offsets) {
@@ -326,26 +314,8 @@ class NotificationService {
     return fireAt;
   }
 
-  bool _isInQuietHours({
-    required DateTime fireAt,
-    required int? quietStartMinutes,
-    required int? quietEndMinutes,
-  }) {
-    if (quietStartMinutes == null || quietEndMinutes == null) return false;
-    final start = quietStartMinutes.clamp(0, 24 * 60 - 1);
-    final end = quietEndMinutes.clamp(0, 24 * 60 - 1);
-    if (start == end) return false;
-
-    final minutes = fireAt.hour * 60 + fireAt.minute;
-    if (start < end) {
-      // e.g. 22:00..07:00 is NOT this case
-      return minutes >= start && minutes < end;
-    }
-    // wraps midnight, e.g. 22:00..07:00
-    return minutes >= start || minutes < end;
-  }
-
-  String _bodyForOffset({required int offsetMinutes}) {
+  /// Relative phrase only ("Starts in 15 minutes", …).
+  String _relativeStartsInPhrase({required int offsetMinutes}) {
     if (offsetMinutes >= 24 * 60 && offsetMinutes % (24 * 60) == 0) {
       final days = offsetMinutes ~/ (24 * 60);
       return days == 1 ? 'Starts in 1 day' : 'Starts in $days days';
@@ -355,6 +325,28 @@ class NotificationService {
       return hours == 1 ? 'Starts in 1 hour' : 'Starts in $hours hours';
     }
     return offsetMinutes == 1 ? 'Starts in 1 minute' : 'Starts in $offsetMinutes minutes';
+  }
+
+  String _minutesToClock(int minutesFromMidnight) {
+    final m = minutesFromMidnight.clamp(0, 24 * 60 - 1);
+    final h = m ~/ 60;
+    final min = m % 60;
+    return '${h.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}';
+  }
+
+  /// Body line: relative reminder + optional scheduled time range.
+  String _notificationBody({
+    required int offsetMinutes,
+    required int startTimeMinutes,
+    int? endTimeMinutes,
+  }) {
+    final lead = _relativeStartsInPhrase(offsetMinutes: offsetMinutes);
+    if (endTimeMinutes != null && endTimeMinutes > startTimeMinutes) {
+      final start = _minutesToClock(startTimeMinutes);
+      final end = _minutesToClock(endTimeMinutes);
+      return '$lead · $start–$end';
+    }
+    return lead;
   }
 
   // Stable 32-bit FNV-1a hash to produce deterministic notification IDs.
