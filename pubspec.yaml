@@ -36,6 +36,9 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
+  web:
+    generate: true
+    image_path: assets/app_icon.png
   image_path: assets/app_icon.png
   # Android 8+ adaptive icon: black artwork on solid background (transparent → white)
   adaptive_icon_background: "#FFFFFF"

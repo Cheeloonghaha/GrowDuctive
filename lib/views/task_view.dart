@@ -21,9 +21,7 @@ import '../navigation/sidebar_drawer_controller.dart';
 Color _darkerCategoryBorderColor(Color pastel, {required bool isDark}) {
   final hsv = HSVColor.fromColor(pastel);
   final factor = isDark ? 0.62 : 0.44;
-  return hsv
-      .withValue((hsv.value * factor).clamp(0.24, 0.88))
-      .toColor();
+  return hsv.withValue((hsv.value * factor).clamp(0.24, 0.88)).toColor();
 }
 
 class TaskScreen extends StatefulWidget {
@@ -36,13 +34,16 @@ class TaskScreen extends StatefulWidget {
   State<TaskScreen> createState() => _TaskScreenState();
 }
 
-class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateMixin {
+class _TaskScreenState extends State<TaskScreen>
+    with SingleTickerProviderStateMixin {
   String _selectedCategory = 'All';
   int _selectedNavIndex = 1; // Tasks is now at index 1
-  String _sortBy = 'date'; // 'date', 'urgency', 'importance', 'duration', 'priority'
+  String _sortBy =
+      'date'; // 'date', 'urgency', 'importance', 'duration', 'priority'
   int _taskListPageIndex = 0; // 0 = Tasks (Active + Completed), 1 = Overdue
   bool _completedSectionExpanded = true; // expand/collapse Completed section
-  DateTime _selectedDate = DateTime.now(); // date used to filter tasks by taskDate
+  DateTime _selectedDate =
+      DateTime.now(); // date used to filter tasks by taskDate
 
   // Cache streams so setState() (e.g. changing _selectedDate) doesn't recreate
   // Firestore listeners on every rebuild.
@@ -90,9 +91,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   _buildHeader(),
                   const SizedBox(height: 10),
                   // BODY SECTION
-                  Expanded(
-                    child: _buildBody(taskVM),
-                  ),
+                  Expanded(child: _buildBody(taskVM)),
                 ],
               ),
             ),
@@ -152,7 +151,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: () {
-                        SidebarDrawerController.scaffoldKey.currentState?.openDrawer();
+                        SidebarDrawerController.scaffoldKey.currentState
+                            ?.openDrawer();
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(8),
@@ -258,239 +258,255 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     const weekStartsOn = UserPreferencesModel.weekMonday;
 
     return StreamBuilder<List<TaskModel>>(
-          stream: _tasksStream,
-          builder: (context, taskSnapshot) {
-            if (taskSnapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 60, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    Text(
-                      "Error loading tasks",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                    ),
-                  ],
+      stream: _tasksStream,
+      builder: (context, taskSnapshot) {
+        if (taskSnapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 60, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  "Error loading tasks",
+                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
                 ),
-              );
+              ],
+            ),
+          );
+        }
+
+        if (taskSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CupertinoActivityIndicator(radius: 16));
+        }
+
+        final allTasks = taskSnapshot.data ?? [];
+        final weekStart = CalendarWeekStrip.weekStartContaining(
+          _selectedDate,
+          weekStartsOn,
+        );
+
+        final weekCounts = List.generate(7, (i) {
+          final d = weekStart.add(Duration(days: i));
+          final dayOnly = DateTime(d.year, d.month, d.day);
+          return allTasks.where((t) => _isSameDay(t.taskDate, dayOnly)).length;
+        });
+
+        // Filter tasks by category
+        return StreamBuilder<List<CategoryModel>>(
+          stream: _categoriesStream,
+          builder: (context, categorySnapshot) {
+            final chrome = context.chrome;
+            final categories = categorySnapshot.data ?? [];
+            final categoryMap = {for (var c in categories) c.id: c.name};
+
+            // Filter by category
+            List<TaskModel> filteredTasks = allTasks;
+            if (_selectedCategory != 'All') {
+              final selectedCategoryId = categories
+                  .firstWhere(
+                    (c) => c.name == _selectedCategory,
+                    orElse: () => CategoryModel(id: '', name: ''),
+                  )
+                  .id;
+              filteredTasks = allTasks
+                  .where((t) => t.categoryId == selectedCategoryId)
+                  .toList();
             }
 
-            if (taskSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CupertinoActivityIndicator(radius: 16),
-              );
-            }
-
-            final allTasks = taskSnapshot.data ?? [];
-            final weekStart = CalendarWeekStrip.weekStartContaining(
-              _selectedDate,
-              weekStartsOn,
+            // Overdue section: all overdue (not completed) tasks, not filtered by date
+            final overdueTasks = _sortTasks(
+              filteredTasks.where((t) => t.overdue && !t.isCompleted).toList(),
             );
 
-            final weekCounts = List.generate(7, (i) {
-              final d = weekStart.add(Duration(days: i));
-              final dayOnly = DateTime(d.year, d.month, d.day);
-              return allTasks.where((t) => _isSameDay(t.taskDate, dayOnly)).length;
-            });
+            // For Tasks tab:
+            // - Active tasks: by creation day (created_at)
+            // - Completed tasks: by completion day (completed_at)
+            final tasksForSelectedDay = filteredTasks
+                .where((t) => _isSameDay(t.taskDate, _selectedDate))
+                .toList();
 
-            // Filter tasks by category
-            return StreamBuilder<List<CategoryModel>>(
-              stream: _categoriesStream,
-              builder: (context, categorySnapshot) {
-                final chrome = context.chrome;
-                final categories = categorySnapshot.data ?? [];
-                final categoryMap = {for (var c in categories) c.id: c.name};
+            final activeTasks = _sortTasks(
+              tasksForSelectedDay
+                  .where((t) => !t.isCompleted && !t.overdue)
+                  .toList(),
+            );
 
-                // Filter by category
-                List<TaskModel> filteredTasks = allTasks;
-                if (_selectedCategory != 'All') {
-                  final selectedCategoryId = categories
-                      .firstWhere(
-                        (c) => c.name == _selectedCategory,
-                        orElse: () => CategoryModel(id: '', name: ''),
-                      )
-                      .id;
-                  filteredTasks = allTasks
-                      .where((t) => t.categoryId == selectedCategoryId)
-                      .toList();
-                }
+            // Fallback to createdAt for legacy tasks that may not have completedAt populated.
+            final completedTasks = _sortTasks(
+              filteredTasks
+                  .where(
+                    (t) =>
+                        t.isCompleted &&
+                        _isSameDay(t.completedAt ?? t.taskDate, _selectedDate),
+                  )
+                  .toList(),
+            );
 
-                // Overdue section: all overdue (not completed) tasks, not filtered by date
-                final overdueTasks = _sortTasks(
-                  filteredTasks.where((t) => t.overdue && !t.isCompleted).toList(),
-                );
-
-                // For Tasks tab:
-                // - Active tasks: by creation day (created_at)
-                // - Completed tasks: by completion day (completed_at)
-                final tasksForSelectedDay = filteredTasks
-                    .where((t) => _isSameDay(t.taskDate, _selectedDate))
-                    .toList();
-
-                final activeTasks = _sortTasks(
-                  tasksForSelectedDay
-                      .where((t) => !t.isCompleted && !t.overdue)
-                      .toList(),
-                );
-
-                // Fallback to createdAt for legacy tasks that may not have completedAt populated.
-                final completedTasks = _sortTasks(
-                  filteredTasks
-                      .where(
-                        (t) => t.isCompleted &&
-                            _isSameDay(t.completedAt ?? t.taskDate, _selectedDate),
-                      )
-                      .toList(),
-                );
-
-                final categoriesRow = categorySnapshot.hasData
-                    ? SizedBox(
-                        height: 38,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  color: chrome.segmentOuter,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: ['All', ...categories.map((c) => c.name)].length,
-                                  padding: EdgeInsets.zero,
-                                  itemBuilder: (context, index) {
-                                    final allNames = ['All', ...categories.map((c) => c.name)];
-                                    final category = allNames[index];
-                                    final isSelected = _selectedCategory == category;
-                                    return _CategoryChip(
-                                      category: category,
-                                      isSelected: isSelected,
-                                      isLast: index == allNames.length - 1,
-                                      onTap: () =>
-                                          setState(() => _selectedCategory = category),
-                                    );
-                                  },
-                                ),
-                              ),
+            final categoriesRow = categorySnapshot.hasData
+                ? SizedBox(
+                    height: 38,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: chrome.segmentOuter,
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () => _showMoreMenu(context, taskVM, categories),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: chrome.segmentOuter,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'More',
-                                      style: TextStyle(
-                                        color: chrome.navBlue,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Icon(Icons.arrow_drop_down,
-                                        color: chrome.navBlue, size: 17),
-                                  ],
-                                ),
-                              ),
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: [
+                                'All',
+                                ...categories.map((c) => c.name),
+                              ].length,
+                              padding: EdgeInsets.zero,
+                              itemBuilder: (context, index) {
+                                final allNames = [
+                                  'All',
+                                  ...categories.map((c) => c.name),
+                                ];
+                                final category = allNames[index];
+                                final isSelected =
+                                    _selectedCategory == category;
+                                return _CategoryChip(
+                                  category: category,
+                                  isSelected: isSelected,
+                                  isLast: index == allNames.length - 1,
+                                  onTap: () => setState(
+                                    () => _selectedCategory = category,
+                                  ),
+                                );
+                              },
                             ),
-                          ],
+                          ),
                         ),
-                      )
-                    : const SizedBox(height: 38);
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () =>
+                              _showMoreMenu(context, taskVM, categories),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: chrome.segmentOuter,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'More',
+                                  style: TextStyle(
+                                    color: chrome.navBlue,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  color: chrome.navBlue,
+                                  size: 17,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox(height: 38);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Surface-backed week strip + category picker, kept in-place via
-                    // spacing compensation (see constants below).
-                    Container(
-                      color: chrome.scaffoldBackground,
-                      child: Builder(
-                        builder: (context) {
-                          final navBlue = chrome.navBlue;
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: Theme.of(context).colorScheme.copyWith(
-                                    onSurface: navBlue,
-                                    primary: navBlue,
-                                  ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.lg,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Surface-backed week strip + category picker, kept in-place via
+                // spacing compensation (see constants below).
+                Container(
+                  color: chrome.scaffoldBackground,
+                  child: Builder(
+                    builder: (context) {
+                      final navBlue = chrome.navBlue;
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            onSurface: navBlue,
+                            primary: navBlue,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(
+                                height: AppSpacing.md - AppSpacing.sm,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  const SizedBox(height: AppSpacing.md - AppSpacing.sm),
-                                  CalendarWeekStrip(
-                                    weekStart: weekStart,
-                                    selectedDate: _selectedDate,
-                                    onDaySelected: (d) => setState(() {
-                                      _selectedDate =
-                                          DateTime(d.year, d.month, d.day);
-                                    }),
-                                    onWeekShift: (delta) {
-                                      final shifted = _selectedDate.add(
-                                        Duration(days: 7 * delta),
-                                      );
-                                      setState(() {
-                                        _selectedDate = DateTime(
-                                          shifted.year,
-                                          shifted.month,
-                                          shifted.day,
-                                        );
-                                      });
-                                    },
-                                    taskCountsForWeek: weekCounts,
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  categoriesRow,
-                                  const SizedBox(height: AppSpacing.sm),
-                                ],
+                              CalendarWeekStrip(
+                                weekStart: weekStart,
+                                selectedDate: _selectedDate,
+                                onDaySelected: (d) => setState(() {
+                                  _selectedDate = DateTime(
+                                    d.year,
+                                    d.month,
+                                    d.day,
+                                  );
+                                }),
+                                onWeekShift: (delta) {
+                                  final shifted = _selectedDate.add(
+                                    Duration(days: 7 * delta),
+                                  );
+                                  setState(() {
+                                    _selectedDate = DateTime(
+                                      shifted.year,
+                                      shifted.month,
+                                      shifted.day,
+                                    );
+                                  });
+                                },
+                                taskCountsForWeek: weekCounts,
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    _buildTaskListSegmentControl(),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: _taskListPageIndex == 0
-                          ? _buildTasksPage(
-                              context,
-                              taskVM,
-                              activeTasks,
-                              completedTasks,
-                              categoryMap,
-                            )
-                          : _buildOverduePage(
-                              context,
-                              taskVM,
-                              overdueTasks,
-                              completedTasks,
-                              categoryMap,
-                            ),
-                    ),
-                  ],
-                );
-              },
+                              const SizedBox(height: AppSpacing.md),
+                              categoriesRow,
+                              const SizedBox(height: AppSpacing.sm),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                _buildTaskListSegmentControl(),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: _taskListPageIndex == 0
+                      ? _buildTasksPage(
+                          context,
+                          taskVM,
+                          activeTasks,
+                          completedTasks,
+                          categoryMap,
+                        )
+                      : _buildOverduePage(
+                          context,
+                          taskVM,
+                          overdueTasks,
+                          completedTasks,
+                          categoryMap,
+                        ),
+                ),
+              ],
             );
           },
         );
+      },
+    );
   }
 
   Widget _buildTaskListSegmentControl() {
@@ -518,7 +534,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   curve: Curves.easeOutCubic,
                   padding: const EdgeInsets.symmetric(vertical: 7),
                   decoration: BoxDecoration(
-                    color: _taskListPageIndex == 0 ? selectedBg : Colors.transparent,
+                    color: _taskListPageIndex == 0
+                        ? selectedBg
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: _taskListPageIndex == 0
                         ? Border.all(color: selectedBorder, width: 1.5)
@@ -547,7 +565,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   curve: Curves.easeOutCubic,
                   padding: const EdgeInsets.symmetric(vertical: 7),
                   decoration: BoxDecoration(
-                    color: _taskListPageIndex == 1 ? selectedBg : Colors.transparent,
+                    color: _taskListPageIndex == 1
+                        ? selectedBg
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: _taskListPageIndex == 1
                         ? Border.all(color: selectedBorder, width: 1.5)
@@ -679,7 +699,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   Widget _buildCompletedSectionHeader(int count) {
     final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: () => setState(() => _completedSectionExpanded = !_completedSectionExpanded),
+      onTap: () => setState(
+        () => _completedSectionExpanded = !_completedSectionExpanded,
+      ),
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.only(left: 4, top: 4, bottom: 4),
@@ -711,7 +733,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
             ),
             const Spacer(),
             Icon(
-              _completedSectionExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              _completedSectionExpanded
+                  ? Icons.keyboard_arrow_up
+                  : Icons.keyboard_arrow_down,
               size: 24,
               color: scheme.onSurfaceVariant,
             ),
@@ -726,7 +750,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   // Show More menu for category management
-  void _showMoreMenu(BuildContext context, TaskViewModel vm, List<CategoryModel> categories) {
+  void _showMoreMenu(
+    BuildContext context,
+    TaskViewModel vm,
+    List<CategoryModel> categories,
+  ) {
     final sheetBg = Theme.of(context).colorScheme.surfaceContainerHigh;
     showModalBottomSheet(
       context: context,
@@ -803,11 +831,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: fg,
-            ),
+            Icon(icon, size: 22, color: fg),
             const SizedBox(width: 16),
             Text(
               label,
@@ -857,7 +881,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedNavIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -905,10 +929,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: Theme.of(context).colorScheme.copyWith(
-              onSurface: navBlue,
-              primary: navBlue,
-              surface: navBg,
-            ),
+          onSurface: navBlue,
+          primary: navBlue,
+          surface: navBg,
+        ),
       ),
       child: Builder(
         builder: (context) {
@@ -925,11 +949,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 width: 1.2,
               ),
             ),
-            child: Icon(
-              Icons.add_rounded,
-              color: scheme.surface,
-              size: 26,
-            ),
+            child: Icon(Icons.add_rounded, color: scheme.surface, size: 26),
           );
         },
       ),
@@ -946,9 +966,12 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     final categoryName = categoryMap[task.categoryId] ?? 'Unknown';
     final pastel = AppColors.categoryPastelFor(task.categoryId);
     final onPastel = AppColors.categoryOnPastel(task.categoryId);
-    final urgencyAccent = task.urgency >= 4 ? AppColors.softGold : AppColors.interactive;
-    final importanceAccent =
-        task.importance >= 4 ? AppColors.softGold : AppColors.interactive;
+    final urgencyAccent = task.urgency >= 4
+        ? AppColors.softGold
+        : AppColors.interactive;
+    final importanceAccent = task.importance >= 4
+        ? AppColors.softGold
+        : AppColors.interactive;
     const titleSize = 13.0;
     const pad = 12.0;
     final scheme = Theme.of(context).colorScheme;
@@ -957,8 +980,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     final cardBorder = task.overdue
         ? AppColors.coral
         : (isDark
-            ? scheme.outline.withValues(alpha: 0.38)
-            : AppColors.borderSubtle);
+              ? scheme.outline.withValues(alpha: 0.38)
+              : AppColors.borderSubtle);
     final accentStrip = task.overdue
         ? AppColors.coral
         : _darkerCategoryBorderColor(pastel, isDark: isDark);
@@ -978,10 +1001,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: cardBorder,
-              width: 1,
-            ),
+            border: Border.all(color: cardBorder, width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.05),
@@ -998,10 +1018,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 left: 0,
                 top: 0,
                 bottom: 0,
-                child: Container(
-                  width: 3,
-                  color: accentStrip,
-                ),
+                child: Container(width: 3, color: accentStrip),
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 3),
@@ -1011,185 +1028,235 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     Padding(
                       padding: EdgeInsets.fromLTRB(pad, pad, pad, 6),
                       child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (!task.isCompleted) {
-                          HapticFeedback.mediumImpact();
-                        } else {
-                          HapticFeedback.selectionClick();
-                        }
-                        vm.toggleComplete(
-                          task.id,
-                          task.isCompleted,
-                          taskCreatedAt: task.createdAt,
-                        );
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: task.isCompleted ? AppColors.jade : AppColors.borderSubtle,
-                            width: 2,
-                          ),
-                          color: task.isCompleted ? AppColors.jade : Colors.transparent,
-                        ),
-                        child: task.isCompleted
-                            ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        task.title,
-                        style: TextStyle(
-                          fontSize: titleSize,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                          color: task.isCompleted
-                              ? scheme.onSurfaceVariant
-                              : scheme.onSurface,
-                          decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          onPressed: () => _showEditTaskDialog(context, vm, task),
-                          icon: Icon(Icons.edit_outlined, color: scheme.onSurfaceVariant, size: 20),
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          onPressed: () => _confirmDelete(context, vm, task),
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            color: AppColors.coral.withValues(alpha: 0.9),
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(pad, 0, pad, pad),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    // Category
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: pastel,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        categoryName,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: onPastel,
-                        ),
-                      ),
-                    ),
-                    // Urgency
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: urgencyAccent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.flag_rounded, size: 11, color: urgencyAccent),
-                          const SizedBox(width: 3),
-                          Text(
-                            'U${task.urgency}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: urgencyAccent,
+                          GestureDetector(
+                            onTap: () {
+                              if (!task.isCompleted) {
+                                HapticFeedback.mediumImpact();
+                              } else {
+                                HapticFeedback.selectionClick();
+                              }
+                              vm.toggleComplete(
+                                task.id,
+                                task.isCompleted,
+                                taskCreatedAt: task.createdAt,
+                              );
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: task.isCompleted
+                                      ? AppColors.jade
+                                      : AppColors.borderSubtle,
+                                  width: 2,
+                                ),
+                                color: task.isCompleted
+                                    ? AppColors.jade
+                                    : Colors.transparent,
+                              ),
+                              child: task.isCompleted
+                                  ? const Icon(
+                                      Icons.check_rounded,
+                                      size: 12,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: TextStyle(
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                                color: task.isCompleted
+                                    ? scheme.onSurfaceVariant
+                                    : scheme.onSurface,
+                                decoration: task.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                onPressed: () =>
+                                    _showEditTaskDialog(context, vm, task),
+                                icon: Icon(
+                                  Icons.edit_outlined,
+                                  color: scheme.onSurfaceVariant,
+                                  size: 20,
+                                ),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                onPressed: () =>
+                                    _confirmDelete(context, vm, task),
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: AppColors.coral.withValues(alpha: 0.9),
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(pad, 0, pad, pad),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          // Category
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: pastel,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              categoryName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: onPastel,
+                              ),
+                            ),
+                          ),
+                          // Urgency
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: urgencyAccent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.flag_rounded,
+                                  size: 11,
+                                  color: urgencyAccent,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'U${task.urgency}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: urgencyAccent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Importance
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: importanceAccent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 11,
+                                  color: importanceAccent,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'I${task.importance}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: importanceAccent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Duration
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outline.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.schedule_rounded,
+                                  size: 11,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${task.duration} min',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Importance
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: importanceAccent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.star_rounded, size: 11, color: importanceAccent),
-                          const SizedBox(width: 3),
-                          Text(
-                            'I${task.importance}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: importanceAccent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Duration
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.schedule_rounded,
-                            size: 11,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${task.duration} min',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
                   ],
                 ),
               ),
@@ -1199,7 +1266,6 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
 
   // View task details dialog - improved information layout
   void _showViewTaskDialog(
@@ -1213,7 +1279,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     // Same hue as category chip, darkened so the modal outline reads clearly.
-    final borderColor = _darkerCategoryBorderColor(categoryPastel, isDark: isDark);
+    final borderColor = _darkerCategoryBorderColor(
+      categoryPastel,
+      isDark: isDark,
+    );
     final titleColor = scheme.onSurface;
     final bodyColor = scheme.onSurface.withValues(alpha: 0.72);
 
@@ -1243,10 +1312,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 left: 0,
                 top: 0,
                 bottom: 0,
-                child: Container(
-                  width: 6,
-                  color: borderColor,
-                ),
+                child: Container(width: 6, color: borderColor),
               ),
               Container(
                 constraints: const BoxConstraints(maxWidth: 420),
@@ -1274,7 +1340,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
-                            child: Icon(Icons.task_alt, color: borderColor, size: 18),
+                            child: Icon(
+                              Icons.task_alt,
+                              color: borderColor,
+                              size: 18,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1332,7 +1402,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                     ),
                                     borderRadius: BorderRadius.circular(999),
                                     border: Border.all(
-                                      color: borderColor.withValues(alpha: 0.95),
+                                      color: borderColor.withValues(
+                                        alpha: 0.95,
+                                      ),
                                       width: 1.25,
                                     ),
                                   ),
@@ -1404,7 +1476,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         ),
                       ),
                     ),
-              
+
                     // Action Buttons
                     Container(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -1417,7 +1489,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                 _showEditTaskDialog(context, vm, task);
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 foregroundColor: scheme.onSurface,
                                 side: BorderSide(
                                   color: borderColor.withValues(alpha: 0.65),
@@ -1447,7 +1521,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: borderColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1481,7 +1557,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         : (task.overdue ? 'Overdue' : 'Active');
     final icon = task.isCompleted
         ? Icons.check_circle
-        : (task.overdue ? Icons.warning_amber_rounded : Icons.radio_button_unchecked);
+        : (task.overdue
+              ? Icons.warning_amber_rounded
+              : Icons.radio_button_unchecked);
     final Color accent = task.isCompleted
         ? Colors.green
         : (task.overdue ? Colors.red : scheme.primary);
@@ -1574,8 +1652,6 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     );
   }
 
-
-
   // Confirm delete dialog — header/snackbar match app chrome (nav blue).
   void _confirmDelete(BuildContext context, TaskViewModel vm, TaskModel task) {
     showDialog(
@@ -1586,7 +1662,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         final chrome = dialogContext.chrome;
         final navBlue = chrome.navBlue;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
@@ -1603,7 +1681,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
@@ -1617,7 +1699,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(dialogContext),
-                        child: const Icon(Icons.close, color: Colors.white, size: 24),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
                     ],
                   ),
@@ -1629,7 +1715,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: AppColors.coral, size: 20),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.coral,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -1658,11 +1748,16 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                           OutlinedButton(
                             onPressed: () => Navigator.pop(dialogContext),
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: navBlue.withValues(alpha: 0.45)),
+                              side: BorderSide(
+                                color: navBlue.withValues(alpha: 0.45),
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
                             ),
                             child: Text(
                               'Cancel',
@@ -1680,7 +1775,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                 if (!dialogContext.mounted) return;
                                 Navigator.pop(dialogContext);
                                 if (!dialogContext.mounted) return;
-                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                ScaffoldMessenger.of(
+                                  dialogContext,
+                                ).showSnackBar(
                                   SnackBar(
                                     content: const Text('Task deleted'),
                                     backgroundColor: navBlue,
@@ -1692,7 +1789,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                 );
                               } catch (e) {
                                 if (!dialogContext.mounted) return;
-                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                ScaffoldMessenger.of(
+                                  dialogContext,
+                                ).showSnackBar(
                                   SnackBar(
                                     content: Text('Could not delete task: $e'),
                                     backgroundColor: Colors.red.shade700,
@@ -1707,13 +1806,14 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
                             ),
                             child: const Text(
                               'Delete',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
                         ],
@@ -1729,11 +1829,18 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showEditTaskDialog(BuildContext parentContext, TaskViewModel vm, TaskModel task) {
+  void _showEditTaskDialog(
+    BuildContext parentContext,
+    TaskViewModel vm,
+    TaskModel task,
+  ) {
     EditTaskBottomSheet.show(
       parentContext,
       taskVM: vm,
-      scheduledTaskVM: Provider.of<ScheduledTaskViewModel>(parentContext, listen: false),
+      scheduledTaskVM: Provider.of<ScheduledTaskViewModel>(
+        parentContext,
+        listen: false,
+      ),
       task: task,
       onTaskDateChanged: (taskDay) {
         if (mounted) setState(() => _selectedDate = taskDay);
@@ -1745,17 +1852,20 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     AddTaskBottomSheet.show(
       context,
       taskVM: vm,
-      scheduledTaskVM: Provider.of<ScheduledTaskViewModel>(context, listen: false),
-      initialTaskDate: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+      scheduledTaskVM: Provider.of<ScheduledTaskViewModel>(
+        context,
+        listen: false,
+      ),
+      initialTaskDate: DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+      ),
       onTaskCreated: (taskDay) {
         if (mounted) setState(() => _selectedDate = taskDay);
       },
     );
   }
-
-
-
-
 
   // Show dialog to add custom category - Redesigned
   void _showAddCategoryDialog(
@@ -1801,7 +1911,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ],
                 ),
@@ -1820,7 +1934,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.black, width: 2),
+                      borderSide: const BorderSide(
+                        color: Colors.black,
+                        width: 2,
+                      ),
                     ),
                   ),
                   autofocus: true,
@@ -1855,13 +1972,17 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       child: ElevatedButton(
                         onPressed: () async {
                           if (categoryController.text.trim().isNotEmpty) {
-                            final categoryId = await vm.addCategory(categoryController.text.trim());
+                            final categoryId = await vm.addCategory(
+                              categoryController.text.trim(),
+                            );
                             if (categoryId != null) {
                               Navigator.pop(context);
                               onCategoryAdded?.call(categoryId);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text("Category '${categoryController.text.trim()}' added!"),
+                                  content: Text(
+                                    "Category '${categoryController.text.trim()}' added!",
+                                  ),
                                   backgroundColor: Colors.black,
                                   behavior: SnackBarBehavior.floating,
                                   shape: RoundedRectangleBorder(
@@ -1872,7 +1993,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                             }
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Please enter a category name")),
+                              const SnackBar(
+                                content: Text("Please enter a category name"),
+                              ),
                             );
                           }
                         },
@@ -1903,11 +2026,15 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   // Show list of categories to edit
-  void _showEditCategoryListDialog(BuildContext context, TaskViewModel vm, List<CategoryModel> categories) {
+  void _showEditCategoryListDialog(
+    BuildContext context,
+    TaskViewModel vm,
+    List<CategoryModel> categories,
+  ) {
     if (categories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No categories to edit")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("No categories to edit")));
       return;
     }
 
@@ -1947,7 +2074,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ],
                 ),
@@ -1978,11 +2109,15 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   // Show list of categories to delete
-  void _showDeleteCategoryListDialog(BuildContext context, TaskViewModel vm, List<CategoryModel> categories) {
+  void _showDeleteCategoryListDialog(
+    BuildContext context,
+    TaskViewModel vm,
+    List<CategoryModel> categories,
+  ) {
     if (categories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No categories to delete")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("No categories to delete")));
       return;
     }
 
@@ -2008,7 +2143,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                    const Icon(
+                      Icons.delete_outline,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
@@ -2022,7 +2161,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ],
                 ),
@@ -2036,7 +2179,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                     final category = categories[index];
                     return ListTile(
                       title: Text(category.name),
-                      trailing: const Icon(Icons.delete_outline, color: Colors.red),
+                      trailing: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         _confirmDeleteCategory(context, vm, category);
@@ -2053,7 +2199,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   // Rename category dialog
-  void _showRenameCategoryDialog(BuildContext context, TaskViewModel vm, CategoryModel category) {
+  void _showRenameCategoryDialog(
+    BuildContext context,
+    TaskViewModel vm,
+    CategoryModel category,
+  ) {
     final controller = TextEditingController(text: category.name);
 
     showDialog(
@@ -2110,7 +2260,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text("Category renamed successfully!"),
+                            content: const Text(
+                              "Category renamed successfully!",
+                            ),
                             backgroundColor: Colors.black,
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
@@ -2126,7 +2278,10 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text("Rename", style: TextStyle(color: Colors.white)),
+                    child: const Text(
+                      "Rename",
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ],
               ),
@@ -2138,7 +2293,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   }
 
   // Confirm delete category dialog — matches task delete (nav blue chrome).
-  void _confirmDeleteCategory(BuildContext context, TaskViewModel vm, CategoryModel category) {
+  void _confirmDeleteCategory(
+    BuildContext context,
+    TaskViewModel vm,
+    CategoryModel category,
+  ) {
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.45),
@@ -2146,7 +2305,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         final scheme = Theme.of(dialogContext).colorScheme;
         final navBlue = dialogContext.chrome.navBlue;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
@@ -2163,7 +2324,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
@@ -2177,7 +2342,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(dialogContext),
-                        child: const Icon(Icons.close, color: Colors.white, size: 24),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
                     ],
                   ),
@@ -2190,7 +2359,11 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: AppColors.coral, size: 20),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.coral,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -2219,11 +2392,16 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                           OutlinedButton(
                             onPressed: () => Navigator.pop(dialogContext),
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: navBlue.withValues(alpha: 0.45)),
+                              side: BorderSide(
+                                color: navBlue.withValues(alpha: 0.45),
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
                             ),
                             child: Text(
                               'Cancel',
@@ -2241,7 +2419,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                 if (!dialogContext.mounted) return;
                                 Navigator.pop(dialogContext);
                                 if (!dialogContext.mounted) return;
-                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                ScaffoldMessenger.of(
+                                  dialogContext,
+                                ).showSnackBar(
                                   SnackBar(
                                     content: const Text('Category deleted'),
                                     backgroundColor: navBlue,
@@ -2255,7 +2435,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                                 if (!dialogContext.mounted) return;
                                 Navigator.pop(dialogContext);
                                 if (!dialogContext.mounted) return;
-                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                ScaffoldMessenger.of(
+                                  dialogContext,
+                                ).showSnackBar(
                                   SnackBar(
                                     content: Text(e.toString()),
                                     backgroundColor: Colors.red.shade700,
@@ -2273,13 +2455,14 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
                             ),
                             child: const Text(
                               'Delete',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ),
                         ],
@@ -2298,7 +2481,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
   // Sort tasks based on selected sort option
   List<TaskModel> _sortTasks(List<TaskModel> tasks) {
     final sortedTasks = List<TaskModel>.from(tasks);
-    
+
     switch (_sortBy) {
       case 'urgency':
         sortedTasks.sort((a, b) => b.urgency.compareTo(a.urgency));
@@ -2318,25 +2501,8 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         sortedTasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
     }
-    
-    return sortedTasks;
-  }
 
-  // Get label for current sort option
-  String _getSortLabel() {
-    switch (_sortBy) {
-      case 'urgency':
-        return 'Urgency';
-      case 'importance':
-        return 'Importance';
-      case 'priority':
-        return 'Priority';
-      case 'duration':
-        return 'Duration';
-      case 'date':
-      default:
-        return 'Date';
-    }
+    return sortedTasks;
   }
 
   // Show sort dialog
@@ -2348,7 +2514,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         final scheme = Theme.of(dialogContext).colorScheme;
         final chrome = dialogContext.chrome;
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 300),
             clipBehavior: Clip.antiAlias,
@@ -2391,8 +2559,15 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         onPressed: () => Navigator.pop(dialogContext),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                        icon: Icon(Icons.close, color: chrome.navBlue, size: 24),
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        icon: Icon(
+                          Icons.close,
+                          color: chrome.navBlue,
+                          size: 24,
+                        ),
                       ),
                     ],
                   ),
@@ -2401,15 +2576,36 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     children: [
-                      _buildSortOption(dialogContext, 'date', 'Date Created',
-                          Icons.calendar_today_outlined),
-                      _buildSortOption(dialogContext, 'priority', 'Priority (U+I)',
-                          Icons.bolt_outlined),
-                      _buildSortOption(dialogContext, 'urgency', 'Urgency', Icons.flag_outlined),
                       _buildSortOption(
-                          dialogContext, 'importance', 'Importance', Icons.star_outline),
+                        dialogContext,
+                        'date',
+                        'Date Created',
+                        Icons.calendar_today_outlined,
+                      ),
                       _buildSortOption(
-                          dialogContext, 'duration', 'Duration', Icons.access_time_outlined),
+                        dialogContext,
+                        'priority',
+                        'Priority (U+I)',
+                        Icons.bolt_outlined,
+                      ),
+                      _buildSortOption(
+                        dialogContext,
+                        'urgency',
+                        'Urgency',
+                        Icons.flag_outlined,
+                      ),
+                      _buildSortOption(
+                        dialogContext,
+                        'importance',
+                        'Importance',
+                        Icons.star_outline,
+                      ),
+                      _buildSortOption(
+                        dialogContext,
+                        'duration',
+                        'Duration',
+                        Icons.access_time_outlined,
+                      ),
                     ],
                   ),
                 ),
@@ -2433,8 +2629,9 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     final isSelected = _sortBy == value;
     final selectedBg = scheme.surfaceContainerHigh;
     // Dark mode: default Material onSurfaceVariant is often too dim on surface.
-    final unselectedFg =
-        isDark ? scheme.onSurface.withValues(alpha: 0.82) : scheme.onSurfaceVariant;
+    final unselectedFg = isDark
+        ? scheme.onSurface.withValues(alpha: 0.82)
+        : scheme.onSurfaceVariant;
     final selectedFg = scheme.onSurface;
 
     return InkWell(
@@ -2449,11 +2646,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
         color: isSelected ? selectedBg : Colors.transparent,
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? selectedFg : unselectedFg,
-            ),
+            Icon(icon, size: 22, color: isSelected ? selectedFg : unselectedFg),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -2465,12 +2658,7 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                 ),
               ),
             ),
-            if (isSelected)
-              Icon(
-                Icons.check,
-                color: scheme.primary,
-                size: 22,
-              ),
+            if (isSelected) Icon(Icons.check, color: scheme.primary, size: 22),
           ],
         ),
       ),
@@ -2501,7 +2689,8 @@ class _CategoryChip extends StatefulWidget {
   State<_CategoryChip> createState() => _CategoryChipState();
 }
 
-class _CategoryChipState extends State<_CategoryChip> with SingleTickerProviderStateMixin {
+class _CategoryChipState extends State<_CategoryChip>
+    with SingleTickerProviderStateMixin {
   bool _isHovered = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -2529,7 +2718,8 @@ class _CategoryChipState extends State<_CategoryChip> with SingleTickerProviderS
     final chrome = context.chrome;
     final selectedBg = chrome.segmentSelectedFill;
     final selectedBorder = chrome.segmentBorder;
-    const unselectedBg = Colors.transparent; // unselected = just text on outer pill
+    const unselectedBg =
+        Colors.transparent; // unselected = just text on outer pill
     final navBlue = chrome.navBlue;
     return MouseRegion(
       onEnter: (_) {
@@ -2551,13 +2741,8 @@ class _CategoryChipState extends State<_CategoryChip> with SingleTickerProviderS
           scale: _scaleAnimation,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-            margin: EdgeInsets.only(
-              right: !widget.isLast ? 8 : 0,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: EdgeInsets.only(right: !widget.isLast ? 8 : 0),
             decoration: BoxDecoration(
               color: widget.isSelected ? selectedBg : unselectedBg,
               borderRadius: BorderRadius.circular(16),
@@ -2571,16 +2756,13 @@ class _CategoryChipState extends State<_CategoryChip> with SingleTickerProviderS
               style: TextStyle(
                 color: navBlue,
                 fontSize: 13,
-                fontWeight: widget.isSelected 
-                    ? FontWeight.w600 
+                fontWeight: widget.isSelected
+                    ? FontWeight.w600
                     : (_isHovered ? FontWeight.w600 : FontWeight.w500),
                 height: 1.0, // Consistent line height
               ),
               textAlign: TextAlign.center,
-              child: Text(
-                widget.category,
-                textAlign: TextAlign.center,
-              ),
+              child: Text(widget.category, textAlign: TextAlign.center),
             ),
           ),
         ),

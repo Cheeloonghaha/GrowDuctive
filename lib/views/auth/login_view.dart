@@ -18,7 +18,6 @@ class _LoginViewState extends State<LoginView> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  String? _errorMessage;
 
   @override
   void dispose() {
@@ -34,7 +33,6 @@ class _LoginViewState extends State<LoginView> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
@@ -47,7 +45,6 @@ class _LoginViewState extends State<LoginView> {
 
     setState(() {
       _isLoading = false;
-      _errorMessage = error;
     });
 
     if (error != null) {
@@ -60,7 +57,7 @@ class _LoginViewState extends State<LoginView> {
     } else {
       // Login successful
       print("Login successful! User ID: ${authVM.currentUser?.uid}");
-      
+
       // If LoginView was pushed as a separate route (e.g., from RegisterView),
       // pop it to return to AuthWrapper, which will then show MainShell.
       // If LoginView is shown directly by AuthWrapper, AuthWrapper will automatically
@@ -71,7 +68,7 @@ class _LoginViewState extends State<LoginView> {
       } else {
         print("LoginView is root route - AuthWrapper will handle navigation");
       }
-      
+
       // Show success message briefly
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -85,7 +82,6 @@ class _LoginViewState extends State<LoginView> {
   Future<void> _handleGoogleSignIn() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
@@ -95,7 +91,6 @@ class _LoginViewState extends State<LoginView> {
 
     setState(() {
       _isLoading = false;
-      _errorMessage = error;
     });
 
     if (error != null) {
@@ -108,12 +103,12 @@ class _LoginViewState extends State<LoginView> {
     } else if (authVM.isLoggedIn) {
       // Google Sign-In successful
       print("Google Sign-In successful! User ID: ${authVM.currentUser?.uid}");
-      
+
       // If LoginView was pushed as a separate route, pop it
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
       }
-      
+
       // Show success message briefly
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -148,7 +143,9 @@ class _LoginViewState extends State<LoginView> {
                       "Enter your email and we'll send you a link to reset your password.",
                       style: TextStyle(
                         fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     SizedBox(height: AppSpacing.lg),
@@ -175,11 +172,15 @@ class _LoginViewState extends State<LoginView> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                  onPressed: isLoading
+                      ? null
+                      : () => Navigator.pop(dialogContext),
                   child: Text(
                     'Cancel',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
                 ),
@@ -189,8 +190,13 @@ class _LoginViewState extends State<LoginView> {
                       : () async {
                           if (!formKey.currentState!.validate()) return;
                           setDialogState(() => isLoading = true);
-                          final authVM = Provider.of<AuthViewModel>(context, listen: false);
-                          final error = await authVM.sendPasswordResetEmail(emailController.text);
+                          final authVM = Provider.of<AuthViewModel>(
+                            context,
+                            listen: false,
+                          );
+                          final error = await authVM.sendPasswordResetEmail(
+                            emailController.text,
+                          );
                           if (!dialogContext.mounted) return;
                           setDialogState(() => isLoading = false);
                           if (error != null) {
@@ -198,7 +204,9 @@ class _LoginViewState extends State<LoginView> {
                               ScaffoldMessenger.of(loginContext).showSnackBar(
                                 SnackBar(
                                   content: Text(error),
-                                  backgroundColor: Theme.of(loginContext).colorScheme.error,
+                                  backgroundColor: Theme.of(
+                                    loginContext,
+                                  ).colorScheme.error,
                                 ),
                               );
                             }
@@ -250,11 +258,7 @@ class _LoginViewState extends State<LoginView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.task_alt,
-                    size: 80,
-                    color: scheme.onSurface,
-                  ),
+                  Icon(Icons.task_alt, size: 80, color: scheme.onSurface),
                   SizedBox(height: AppSpacing.md),
                   Text(
                     'GrowDuctive',
@@ -305,7 +309,9 @@ class _LoginViewState extends State<LoginView> {
                       prefixIcon: const Icon(Icons.lock_outlined),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
                         ),
                         onPressed: () {
                           setState(() {
@@ -346,7 +352,9 @@ class _LoginViewState extends State<LoginView> {
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.md,
+                      ),
                     ),
                     child: _isLoading
                         ? SizedBox(
@@ -370,9 +378,15 @@ class _LoginViewState extends State<LoginView> {
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: scheme.outline.withValues(alpha: 0.45))),
+                      Expanded(
+                        child: Divider(
+                          color: scheme.outline.withValues(alpha: 0.45),
+                        ),
+                      ),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                        ),
                         child: Text(
                           'OR',
                           style: TextStyle(
@@ -381,7 +395,11 @@ class _LoginViewState extends State<LoginView> {
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: scheme.outline.withValues(alpha: 0.45))),
+                      Expanded(
+                        child: Divider(
+                          color: scheme.outline.withValues(alpha: 0.45),
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: AppSpacing.md),
@@ -390,7 +408,9 @@ class _LoginViewState extends State<LoginView> {
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _handleGoogleSignIn,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.md,
+                      ),
                     ),
                     icon: Image.network(
                       'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
@@ -416,7 +436,9 @@ class _LoginViewState extends State<LoginView> {
                     children: [
                       Text(
                         "Don't have an account? ",
-                        style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
+                        style: TextStyle(
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                       TextButton(
                         onPressed: () {

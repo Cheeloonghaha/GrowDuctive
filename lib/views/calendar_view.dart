@@ -33,7 +33,6 @@ enum _DragMode { move, resizeTop, resizeBottom }
 
 class _CalendarViewState extends State<CalendarView> {
   DateTime _selectedDate = DateTime.now();
-  DateTime _lastObservedDateOnly = DateTime.now();
   Timer? _dateTicker;
   bool _userSelectedDate = false;
   bool _calendarFabOpen = false;
@@ -72,7 +71,6 @@ class _CalendarViewState extends State<CalendarView> {
     super.initState();
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
-    _lastObservedDateOnly = _selectedDate;
 
     // Keep the calendar "Today" in sync with the device date if the app stays open.
     // If the user manually selects a date, we stop auto-updating.
@@ -84,11 +82,8 @@ class _CalendarViewState extends State<CalendarView> {
         if (!mounted) return;
         setState(() {
           _selectedDate = todayOnly;
-          _lastObservedDateOnly = todayOnly;
         });
-      } else {
-        _lastObservedDateOnly = todayOnly;
-      }
+      } else {}
     });
 
     // Scroll to 6am after the first frame is built
@@ -172,10 +167,10 @@ class _CalendarViewState extends State<CalendarView> {
           child: Theme(
             data: Theme.of(context).copyWith(
               colorScheme: Theme.of(context).colorScheme.copyWith(
-                    onSurface: navBlue,
-                    primary: navBlue,
-                    surface: navBg,
-                  ),
+                onSurface: navBlue,
+                primary: navBlue,
+                surface: navBg,
+              ),
             ),
             child: CalendarSpeedDial(
               open: _calendarFabOpen,
@@ -205,10 +200,9 @@ class _CalendarViewState extends State<CalendarView> {
 
     return Theme(
       data: Theme.of(context).copyWith(
-        colorScheme: Theme.of(context).colorScheme.copyWith(
-              onSurface: navBlue,
-              primary: navBlue,
-            ),
+        colorScheme: Theme.of(
+          context,
+        ).colorScheme.copyWith(onSurface: navBlue, primary: navBlue),
       ),
       child: Container(
         color: context.chrome.scaffoldBackground,
@@ -234,9 +228,7 @@ class _CalendarViewState extends State<CalendarView> {
               selectedDate: _selectedDate,
               onDaySelected: _onDateChanged,
               onWeekShift: (delta) {
-                _onDateChanged(
-                  _selectedDate.add(Duration(days: 7 * delta)),
-                );
+                _onDateChanged(_selectedDate.add(Duration(days: 7 * delta)));
               },
               taskCountsForWeek: counts,
             );
@@ -288,7 +280,8 @@ class _CalendarViewState extends State<CalendarView> {
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: () {
-                        SidebarDrawerController.scaffoldKey.currentState?.openDrawer();
+                        SidebarDrawerController.scaffoldKey.currentState
+                            ?.openDrawer();
                       },
                       child: const Padding(
                         padding: EdgeInsets.all(8),
@@ -686,7 +679,12 @@ class _CalendarViewState extends State<CalendarView> {
                               title: 'Overdue tasks',
                               subtitle:
                                   unscheduledTasks
-                                      .where((t) => TaskViewModel.computeShouldBeOverdue(t))
+                                      .where(
+                                        (t) =>
+                                            TaskViewModel.computeShouldBeOverdue(
+                                              t,
+                                            ),
+                                      )
                                       .isEmpty
                                   ? 'None'
                                   : '${unscheduledTasks.where((t) => TaskViewModel.computeShouldBeOverdue(t)).length} task${unscheduledTasks.where((t) => TaskViewModel.computeShouldBeOverdue(t)).length == 1 ? '' : 's'}',
@@ -694,7 +692,12 @@ class _CalendarViewState extends State<CalendarView> {
                               headerColor: Colors.red.shade600,
                               child: () {
                                 final overdue = unscheduledTasks
-                                    .where((t) => TaskViewModel.computeShouldBeOverdue(t))
+                                    .where(
+                                      (t) =>
+                                          TaskViewModel.computeShouldBeOverdue(
+                                            t,
+                                          ),
+                                    )
                                     .toList();
                                 if (overdue.isEmpty) {
                                   return Padding(
@@ -759,7 +762,12 @@ class _CalendarViewState extends State<CalendarView> {
                                   'Tasks for ${_formatHeaderDate(_selectedDate)}',
                               subtitle:
                                   unscheduledTasks
-                                      .where((t) => !TaskViewModel.computeShouldBeOverdue(t))
+                                      .where(
+                                        (t) =>
+                                            !TaskViewModel.computeShouldBeOverdue(
+                                              t,
+                                            ),
+                                      )
                                       .isEmpty
                                   ? 'None'
                                   : '${unscheduledTasks.where((t) => !TaskViewModel.computeShouldBeOverdue(t)).length} task${unscheduledTasks.where((t) => !TaskViewModel.computeShouldBeOverdue(t)).length == 1 ? '' : 's'}',
@@ -767,7 +775,12 @@ class _CalendarViewState extends State<CalendarView> {
                               headerColor: Colors.black,
                               child: () {
                                 final todays = unscheduledTasks
-                                    .where((t) => !TaskViewModel.computeShouldBeOverdue(t))
+                                    .where(
+                                      (t) =>
+                                          !TaskViewModel.computeShouldBeOverdue(
+                                            t,
+                                          ),
+                                    )
                                     .toList();
                                 if (todays.isEmpty) {
                                   return Padding(
@@ -1156,10 +1169,9 @@ class _CalendarViewState extends State<CalendarView> {
                       child: Container(
                         margin: const EdgeInsets.only(top: 0),
                         height: 1,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.22),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.22),
                       ),
                     ),
                   ],
@@ -2192,10 +2204,12 @@ class _CalendarViewState extends State<CalendarView> {
   Future<Set<String>?> _showFullDayTaskSelectionSheet({
     required List<TaskModel> candidates,
   }) async {
-    final overdue =
-        candidates.where((t) => TaskViewModel.computeShouldBeOverdue(t)).toList();
-    final todays =
-        candidates.where((t) => !TaskViewModel.computeShouldBeOverdue(t)).toList();
+    final overdue = candidates
+        .where((t) => TaskViewModel.computeShouldBeOverdue(t))
+        .toList();
+    final todays = candidates
+        .where((t) => !TaskViewModel.computeShouldBeOverdue(t))
+        .toList();
     final selectedTaskIds = <String>{for (final t in candidates) t.id};
 
     return showModalBottomSheet<Set<String>>(
@@ -2503,506 +2517,510 @@ class _CalendarViewState extends State<CalendarView> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-                final scheme = Theme.of(context).colorScheme;
+            final scheme = Theme.of(context).colorScheme;
 
-                if (!didInitReminderState) {
-                  didInitReminderState = true;
-                  remindersEnabledState = st.remindersEnabled ?? true;
-                  selectedOffsetsState
-                    ..clear()
-                    ..addAll(st.reminderOffsetsMinutes);
-                }
+            if (!didInitReminderState) {
+              didInitReminderState = true;
+              remindersEnabledState = st.remindersEnabled ?? true;
+              selectedOffsetsState
+                ..clear()
+                ..addAll(st.reminderOffsetsMinutes);
+            }
 
-                Future<void> addCustomOffset() async {
-                  final controller = TextEditingController();
-                  final value = await showDialog<int?>(
-                    context: context,
-                    builder: (dCtx) => AlertDialog(
-                      title: const Text('Custom reminder'),
-                      content: TextField(
-                        controller: controller,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Minutes before',
-                          hintText: 'e.g. 90',
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dCtx, null),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          onPressed: () {
-                            final parsed = int.tryParse(controller.text.trim());
-                            if (parsed == null || parsed <= 0) {
-                              Navigator.pop(dCtx, null);
-                              return;
-                            }
-                            Navigator.pop(dCtx, parsed);
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ],
+            Future<void> addCustomOffset() async {
+              final controller = TextEditingController();
+              final value = await showDialog<int?>(
+                context: context,
+                builder: (dCtx) => AlertDialog(
+                  title: const Text('Custom reminder'),
+                  content: TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Minutes before',
+                      hintText: 'e.g. 90',
                     ),
-                  );
-                  if (value != null && value > 0) {
-                    setSheetState(() => selectedOffsetsState.add(value));
-                  }
-                }
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dCtx, null),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () {
+                        final parsed = int.tryParse(controller.text.trim());
+                        if (parsed == null || parsed <= 0) {
+                          Navigator.pop(dCtx, null);
+                          return;
+                        }
+                        Navigator.pop(dCtx, parsed);
+                      },
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              );
+              if (value != null && value > 0) {
+                setSheetState(() => selectedOffsetsState.add(value));
+              }
+            }
 
-                Future<void> saveReminderSettings() async {
-                  try {
-                    await scheduledVM.updateScheduledTask(
-                      id: st.id,
-                      scheduleDate: _selectedDate,
-                      startTimeMinutes: st.startTime,
-                      endTimeMinutes: st.endTime,
-                      reminderOffsetsMinutes: selectedOffsetsState.toList(),
-                      remindersEnabled: remindersEnabledState,
-                    );
-                    final effectiveOffsets = selectedOffsetsState.isEmpty
-                        ? <int>[NotificationService.kDefaultReminderMinutesBefore]
-                        : selectedOffsetsState.toList();
-                    effectiveOffsets.removeWhere((v) => v <= 0);
-                    effectiveOffsets.sort((a, b) => b.compareTo(a));
-                    final offsetsText = effectiveOffsets.isEmpty
-                        ? 'no offsets'
-                        : effectiveOffsets
-                              .map((m) => m == 1440 ? '1 day' : '$m min')
-                              .join(', ');
-                    setSheetState(() {
-                      reminderSaveError = false;
-                      reminderSaveMessage =
-                          'Saved for "$title" (${_minutesToTime(st.startTime)} - ${_minutesToTime(st.endTime)}), offsets: $offsetsText.';
-                    });
-                  } catch (_) {
-                    setSheetState(() {
-                      reminderSaveError = true;
-                      reminderSaveMessage =
-                          'Could not save reminders for "$title". Please try again.';
-                    });
-                  }
-                }
+            Future<void> saveReminderSettings() async {
+              try {
+                await scheduledVM.updateScheduledTask(
+                  id: st.id,
+                  scheduleDate: _selectedDate,
+                  startTimeMinutes: st.startTime,
+                  endTimeMinutes: st.endTime,
+                  reminderOffsetsMinutes: selectedOffsetsState.toList(),
+                  remindersEnabled: remindersEnabledState,
+                );
+                final effectiveOffsets = selectedOffsetsState.isEmpty
+                    ? <int>[NotificationService.kDefaultReminderMinutesBefore]
+                    : selectedOffsetsState.toList();
+                effectiveOffsets.removeWhere((v) => v <= 0);
+                effectiveOffsets.sort((a, b) => b.compareTo(a));
+                final offsetsText = effectiveOffsets.isEmpty
+                    ? 'no offsets'
+                    : effectiveOffsets
+                          .map((m) => m == 1440 ? '1 day' : '$m min')
+                          .join(', ');
+                setSheetState(() {
+                  reminderSaveError = false;
+                  reminderSaveMessage =
+                      'Saved for "$title" (${_minutesToTime(st.startTime)} - ${_minutesToTime(st.endTime)}), offsets: $offsetsText.';
+                });
+              } catch (_) {
+                setSheetState(() {
+                  reminderSaveError = true;
+                  reminderSaveMessage =
+                      'Could not save reminders for "$title". Please try again.';
+                });
+              }
+            }
 
-                return DraggableScrollableSheet(
-                  initialChildSize: 0.6,
-                  minChildSize: 0.35,
-                  maxChildSize: 0.9,
-                  expand: false,
-                  builder: (context, scrollController) => SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(top: 12, bottom: 8),
-                          decoration: BoxDecoration(
-                            color: scheme.outline.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(2),
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              minChildSize: 0.35,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      decoration: BoxDecoration(
+                        color: scheme.outline.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: scheme.onSurface.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.event_note,
+                              color: scheme.onSurface,
+                              size: 24,
+                            ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: scheme.onSurface.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.event_note,
-                                  color: scheme.onSurface,
-                                  size: 24,
-                                ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              'Scheduled task',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: scheme.onSurface,
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Text(
-                                  'Scheduled task',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: scheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        Flexible(
-                          child: SingleChildScrollView(
-                            controller: scrollController,
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: scheme.onSurface,
-                                  ),
-                                ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _detailRow(
+                              Icons.schedule,
+                              'Time',
+                              '${_minutesToTime(st.startTime)} – ${_minutesToTime(st.endTime)} (${st.durationMinutes} min)',
+                            ),
+                            if (task != null) ...[
+                              if (task.description.isNotEmpty) ...[
                                 const SizedBox(height: 12),
                                 _detailRow(
-                                  Icons.schedule,
-                                  'Time',
-                                  '${_minutesToTime(st.startTime)} – ${_minutesToTime(st.endTime)} (${st.durationMinutes} min)',
+                                  Icons.description_outlined,
+                                  'Description',
+                                  task.description,
                                 ),
-                                if (task != null) ...[
-                                  if (task.description.isNotEmpty) ...[
-                                    const SizedBox(height: 12),
-                                    _detailRow(
-                                      Icons.description_outlined,
-                                      'Description',
-                                      task.description,
-                                    ),
-                                  ],
-                                  const SizedBox(height: 12),
-                                  _detailRow(
-                                    Icons.flag_outlined,
-                                    'Urgency',
-                                    '${task.urgency}/5',
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _detailRow(
-                                    Icons.star_outline,
-                                    'Importance',
-                                    '${task.importance}/5',
-                                  ),
-                                  const SizedBox(height: 12),
-                                  StreamBuilder<List<CategoryModel>>(
-                                    stream: taskVM.categoriesStream,
-                                    builder: (context, snapshot) {
-                                      String categoryName = task.categoryId;
-                                      if (snapshot.hasData) {
-                                        for (final c in snapshot.data!) {
-                                          if (c.id == task.categoryId) {
-                                            categoryName = c.name;
-                                            break;
-                                          }
-                                        }
+                              ],
+                              const SizedBox(height: 12),
+                              _detailRow(
+                                Icons.flag_outlined,
+                                'Urgency',
+                                '${task.urgency}/5',
+                              ),
+                              const SizedBox(height: 8),
+                              _detailRow(
+                                Icons.star_outline,
+                                'Importance',
+                                '${task.importance}/5',
+                              ),
+                              const SizedBox(height: 12),
+                              StreamBuilder<List<CategoryModel>>(
+                                stream: taskVM.categoriesStream,
+                                builder: (context, snapshot) {
+                                  String categoryName = task.categoryId;
+                                  if (snapshot.hasData) {
+                                    for (final c in snapshot.data!) {
+                                      if (c.id == task.categoryId) {
+                                        categoryName = c.name;
+                                        break;
                                       }
-                                      return _detailRow(
-                                        Icons.label_outline,
-                                        'Category',
-                                        categoryName,
-                                      );
-                                    },
+                                    }
+                                  }
+                                  return _detailRow(
+                                    Icons.label_outline,
+                                    'Category',
+                                    categoryName,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _detailRow(
+                                Icons.timer_outlined,
+                                'Duration',
+                                '${task.duration} min',
+                              ),
+                              const SizedBox(height: 8),
+                              _detailRow(
+                                Icons.info_outline,
+                                'Task status',
+                                task.status,
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            _detailRow(
+                              Icons.calendar_today,
+                              'Schedule status',
+                              st.status,
+                            ),
+                            const SizedBox(height: 24),
+                            Divider(
+                              height: 1,
+                              color: scheme.outline.withValues(alpha: 0.28),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Reminders',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                'Remind me',
+                                style: TextStyle(
+                                  color: scheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                remindersEnabledState
+                                    ? 'Notifications will be scheduled for this task'
+                                    : 'No reminders for this scheduled task',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              value: remindersEnabledState,
+                              onChanged: (v) => setSheetState(() {
+                                remindersEnabledState = v;
+                              }),
+                            ),
+                            const SizedBox(height: 6),
+                            if (remindersEnabledState) ...[
+                              Text(
+                                'Minutes before start',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final minutes in const [
+                                    5,
+                                    10,
+                                    15,
+                                    30,
+                                    60,
+                                    1440,
+                                  ])
+                                    FilterChip(
+                                      label: Text(
+                                        minutes == 1440 ? '1 day' : '$minutes',
+                                      ),
+                                      selected: selectedOffsetsState.contains(
+                                        minutes,
+                                      ),
+                                      onSelected: (sel) => setSheetState(() {
+                                        if (sel) {
+                                          selectedOffsetsState.add(minutes);
+                                        } else {
+                                          selectedOffsetsState.remove(minutes);
+                                        }
+                                      }),
+                                    ),
+                                  ActionChip(
+                                    label: const Text('Custom'),
+                                    onPressed: addCustomOffset,
                                   ),
-                                  const SizedBox(height: 8),
-                                  _detailRow(
-                                    Icons.timer_outlined,
-                                    'Duration',
-                                    '${task.duration} min',
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _detailRow(
-                                    Icons.info_outline,
-                                    'Task status',
-                                    task.status,
-                                  ),
+                                  for (final minutes
+                                      in (selectedOffsetsState
+                                          .where(
+                                            (m) => !_presetReminderOffsets
+                                                .contains(m),
+                                          )
+                                          .toList()
+                                        ..sort()))
+                                    FilterChip(
+                                      label: Text(
+                                        minutes >= 60 && minutes % 60 == 0
+                                            ? '${minutes ~/ 60} hr'
+                                            : '$minutes min',
+                                      ),
+                                      selected: true,
+                                      onSelected: (sel) => setSheetState(() {
+                                        if (!sel) {
+                                          selectedOffsetsState.remove(minutes);
+                                        }
+                                      }),
+                                    ),
                                 ],
-                                const SizedBox(height: 8),
-                                _detailRow(
-                                  Icons.calendar_today,
-                                  'Schedule status',
-                                  st.status,
+                              ),
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: FilledButton(
+                                  onPressed: saveReminderSettings,
+                                  child: const Text('Save reminders'),
                                 ),
-                                const SizedBox(height: 24),
-                                Divider(height: 1, color: scheme.outline.withValues(alpha: 0.28)),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Reminders',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: scheme.onSurface,
-                                  ),
-                                ),
+                              ),
+                              if (reminderSaveMessage != null) ...[
                                 const SizedBox(height: 10),
-                                SwitchListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(
-                                    'Remind me',
-                                    style: TextStyle(
-                                      color: scheme.onSurface,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    remindersEnabledState
-                                        ? 'Notifications will be scheduled for this task'
-                                        : 'No reminders for this scheduled task',
-                                    style: TextStyle(
-                                      color: scheme.onSurfaceVariant,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  value: remindersEnabledState,
-                                  onChanged: (v) => setSheetState(() {
-                                    remindersEnabledState = v;
-                                  }),
-                                ),
-                                const SizedBox(height: 6),
-                                if (remindersEnabledState) ...[
-                                  Text(
-                                    'Minutes before start',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: scheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      for (final minutes in const [
-                                        5,
-                                        10,
-                                        15,
-                                        30,
-                                        60,
-                                        1440,
-                                      ])
-                                        FilterChip(
-                                          label: Text(
-                                            minutes == 1440
-                                                ? '1 day'
-                                                : '$minutes',
-                                          ),
-                                          selected: selectedOffsetsState
-                                              .contains(minutes),
-                                          onSelected: (sel) =>
-                                              setSheetState(() {
-                                                if (sel) {
-                                                  selectedOffsetsState.add(
-                                                    minutes,
-                                                  );
-                                                } else {
-                                                  selectedOffsetsState.remove(
-                                                    minutes,
-                                                  );
-                                                }
-                                              }),
-                                        ),
-                                      ActionChip(
-                                        label: const Text('Custom'),
-                                        onPressed: addCustomOffset,
-                                      ),
-                                      for (final minutes
-                                          in (selectedOffsetsState
-                                              .where(
-                                                (m) => !_presetReminderOffsets
-                                                    .contains(m),
-                                              )
-                                              .toList()
-                                            ..sort()))
-                                        FilterChip(
-                                          label: Text(
-                                            minutes >= 60 && minutes % 60 == 0
-                                                ? '${minutes ~/ 60} hr'
-                                                : '$minutes min',
-                                          ),
-                                          selected: true,
-                                          onSelected: (sel) =>
-                                              setSheetState(() {
-                                                if (!sel) {
-                                                  selectedOffsetsState.remove(
-                                                    minutes,
-                                                  );
-                                                }
-                                              }),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: FilledButton(
-                                      onPressed: saveReminderSettings,
-                                      child: const Text('Save reminders'),
-                                    ),
-                                  ),
-                                  if (reminderSaveMessage != null) ...[
-                                    const SizedBox(height: 10),
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: reminderSaveError
-                                            ? scheme.errorContainer
-                                            : (scheme.brightness == Brightness.dark
-                                                ? Color.alphaBlend(
-                                                    Colors.green.withValues(alpha: 0.28),
-                                                    scheme.surfaceContainerHighest,
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: reminderSaveError
+                                        ? scheme.errorContainer
+                                        : (scheme.brightness == Brightness.dark
+                                              ? Color.alphaBlend(
+                                                  Colors.green.withValues(
+                                                    alpha: 0.28,
+                                                  ),
+                                                  scheme
+                                                      .surfaceContainerHighest,
+                                                )
+                                              : Colors.green.shade50),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: reminderSaveError
+                                          ? scheme.error.withValues(alpha: 0.65)
+                                          : (scheme.brightness ==
+                                                    Brightness.dark
+                                                ? Colors.green.withValues(
+                                                    alpha: 0.5,
                                                   )
-                                                : Colors.green.shade50),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: reminderSaveError
-                                              ? scheme.error.withValues(alpha: 0.65)
-                                              : (scheme.brightness == Brightness.dark
-                                                  ? Colors.green.withValues(alpha: 0.5)
-                                                  : Colors.green.shade200),
-                                        ),
+                                                : Colors.green.shade200),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        reminderSaveError
+                                            ? Icons.error_outline
+                                            : Icons.check_circle_outline,
+                                        size: 18,
+                                        color: reminderSaveError
+                                            ? scheme.onErrorContainer
+                                            : (scheme.brightness ==
+                                                      Brightness.dark
+                                                  ? Colors.lightGreenAccent
+                                                  : Colors.green.shade700),
                                       ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Icon(
-                                            reminderSaveError
-                                                ? Icons.error_outline
-                                                : Icons.check_circle_outline,
-                                            size: 18,
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          reminderSaveMessage!,
+                                          style: TextStyle(
+                                            fontSize: 12,
                                             color: reminderSaveError
                                                 ? scheme.onErrorContainer
                                                 : (scheme.brightness ==
-                                                        Brightness.dark
-                                                    ? Colors.lightGreenAccent
-                                                    : Colors.green.shade700),
+                                                          Brightness.dark
+                                                      ? scheme.onSurface
+                                                      : Colors.green.shade800),
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              reminderSaveMessage!,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: reminderSaveError
-                                                    ? scheme.onErrorContainer
-                                                    : (scheme.brightness ==
-                                                            Brightness.dark
-                                                        ? scheme.onSurface
-                                                        : Colors.green.shade800),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                                const SizedBox(height: 24),
-                                Divider(height: 1, color: scheme.outline.withValues(alpha: 0.28)),
-                                const SizedBox(height: 16),
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () async {
-                                      Navigator.pop(ctx);
-                                      final removedKey =
-                                          '${st.taskId}|${_selectedDate.year}_${_selectedDate.month}_${_selectedDate.day}';
-                                      setState(
-                                        () => _removedFromCalendarKeys.add(
-                                          removedKey,
-                                        ),
-                                      );
-                                      try {
-                                        await scheduledVM.deleteScheduledTask(st.id);
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Removed "$title" from calendar',
-                                              ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                              backgroundColor: Colors.black,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      } catch (_) {
-                                        setState(
-                                          () => _removedFromCalendarKeys.remove(
-                                            removedKey,
-                                          ),
-                                        );
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Could not remove from schedule',
-                                              ),
-                                              backgroundColor: Colors.red,
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 11,
-                                        horizontal: 16,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.red.shade200,
-                                          width: 1.2,
                                         ),
                                       ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.red.shade100,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Icon(
-                                              Icons.event_busy_rounded,
-                                              size: 20,
-                                              color: Colors.red.shade700,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            'Remove from calendar',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.red.shade800,
-                                              fontSize: 15,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                    ],
                                   ),
                                 ),
                               ],
+                            ],
+                            const SizedBox(height: 24),
+                            Divider(
+                              height: 1,
+                              color: scheme.outline.withValues(alpha: 0.28),
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  final removedKey =
+                                      '${st.taskId}|${_selectedDate.year}_${_selectedDate.month}_${_selectedDate.day}';
+                                  setState(
+                                    () => _removedFromCalendarKeys.add(
+                                      removedKey,
+                                    ),
+                                  );
+                                  try {
+                                    await scheduledVM.deleteScheduledTask(
+                                      st.id,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Removed "$title" from calendar',
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                          backgroundColor: Colors.black,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (_) {
+                                    setState(
+                                      () => _removedFromCalendarKeys.remove(
+                                        removedKey,
+                                      ),
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not remove from schedule',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 11,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.red.shade200,
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade100,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.event_busy_rounded,
+                                          size: 20,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Remove from calendar',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red.shade800,
+                                          fontSize: 15,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                );
+                  ],
+                ),
+              ),
+            );
           },
         );
       },

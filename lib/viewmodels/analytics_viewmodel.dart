@@ -289,25 +289,24 @@ class AnalyticsViewModel extends ChangeNotifier {
     );
   }
 
-  /// Productivity score (0–100): rewards completion rate, number of days with
-  /// completed tasks, and total tasks. More tasks and more active days = higher score.
-  /// No hardcoded task cap; volume uses diminishing returns so score scales with activity.
-  int _productivityScore(double completionRate, List<int> weeklyCompleted) {
-    final weeklyTotal = weeklyCompleted.reduce((a, b) => a + b);
-    final daysWithActivity = weeklyCompleted.where((c) => c > 0).length;
+    /// Productivity score (0–100): rewards completion rate, number of days with
+    /// completed tasks, and total tasks. More tasks and more active days = higher score.
+    int _productivityScore(double completionRate, List<int> weeklyCompleted) {
+      final weeklyTotal = weeklyCompleted.reduce((a, b) => a + b);
+      final daysWithActivity = weeklyCompleted.where((c) => c > 0).length;
 
-    // Completion rate: up to 40 pts (finish what you start)
-    final completionPart = completionRate * 40;
+      // Completion rate: up to 40 pts (finish what you start)
+      final completionPart = completionRate * 40;
 
-    // Consistency: up to 30 pts (active on more days in the week)
-    final daysPart = (daysWithActivity / 7) * 30;
+      // Consistency: up to 30 pts (active on more days in the week)
+      final daysPart = (daysWithActivity / 7) * 30;
 
-    // Volume: up to 30 pts (more tasks = higher; diminishing returns, no fixed cap)
-    final volumePart = weeklyTotal > 0 ? 30 * (1 - 1 / (1 + weeklyTotal)) : 0.0;
+      // Volume: up to 30 pts (more tasks = higher; diminishing returns, no fixed cap)
+      final volumePart = weeklyTotal > 0 ? 30 * (1 - 1 / (1 + weeklyTotal)) : 0.0;
 
-    final raw = completionPart + daysPart + volumePart;
-    return raw.round().clamp(0, 100);
-  }
+      final raw = completionPart + daysPart + volumePart;
+      return raw.round().clamp(0, 100);
+    }
 
   StreamSubscription<QuerySnapshot>? _focusStreamSub;
   StreamSubscription<DateTime>? _focusWeekSub;

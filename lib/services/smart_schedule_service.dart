@@ -233,8 +233,8 @@ class SmartScheduleService {
   /// chosen by the user. The organizer:
   /// - Only considers [selectedTasks]
   /// - Only schedules inside [rangeStartMinutes]..[rangeEndMinutes]
-  /// - Still avoids [existingBlocks] on the calendar
-  /// - Still uses user preferences (break duration / break-after) when provided
+  /// - Avoids [existingBlocks] on the calendar
+  /// - Uses user preferences (break duration / break-after) when provided
   static SmartScheduleResult generateScheduleForRange({
     required DateTime date,
     required List<TaskModel> selectedTasks,

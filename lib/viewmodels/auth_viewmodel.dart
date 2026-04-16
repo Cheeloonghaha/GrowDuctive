@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/user_profile_model.dart';
-import '../firebase_options.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  
+
   // Initialize GoogleSignIn with clientId for web platform
   // For web, we need the OAuth 2.0 Client ID from Firebase Console
   // This will be read from the meta tag in index.html, but we can also set it here
@@ -18,7 +16,7 @@ class AuthViewModel extends ChangeNotifier {
     // Get it from: Firebase Console > Project Settings > Your apps > Web app > OAuth client ID
     // For now, we'll let it use the meta tag approach (recommended for web)
   );
-  
+
   User? _currentUser;
 
   User? get currentUser => _currentUser;
@@ -70,10 +68,7 @@ class AuthViewModel extends ChangeNotifier {
       await result.user?.reload();
 
       // Create user profile document in Firestore (no password_hash – Auth handles that)
-      await _createUserDocument(
-        result.user!,
-        username: usernameTrim,
-      );
+      await _createUserDocument(result.user!, username: usernameTrim);
 
       return null; // Success
     } on FirebaseAuthException catch (e) {
@@ -99,7 +94,7 @@ class AuthViewModel extends ChangeNotifier {
       );
 
       print("Sign in successful! User ID: ${userCredential.user?.uid}");
-      
+
       // Update current user immediately
       _currentUser = userCredential.user;
       notifyListeners();
@@ -133,14 +128,15 @@ class AuthViewModel extends ChangeNotifier {
     try {
       // Trigger the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         // User cancelled the sign-in
         return null; // Return null to indicate cancellation (not an error)
       }
 
       // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(
@@ -150,9 +146,9 @@ class AuthViewModel extends ChangeNotifier {
 
       // Sign in to Firebase with the Google credential
       final userCredential = await _auth.signInWithCredential(credential);
-      
+
       print("Google Sign-In successful! User ID: ${userCredential.user?.uid}");
-      
+
       // Update current user immediately
       _currentUser = userCredential.user;
       notifyListeners();
@@ -160,16 +156,16 @@ class AuthViewModel extends ChangeNotifier {
       // Extract username from Google account
       // Use displayName if available, otherwise use email prefix
       String username = _extractUsernameFromGoogleUser(googleUser);
-      
+
       // Check if user profile already exists
-      final userDoc = await _db.collection('users').doc(userCredential.user!.uid).get();
-      
+      final userDoc = await _db
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
+
       if (!userDoc.exists) {
         // New user - create profile document
-        await _createUserDocument(
-          userCredential.user!,
-          username: username,
-        );
+        await _createUserDocument(userCredential.user!, username: username);
       } else {
         // Existing user - update last login
         await _db.collection('users').doc(userCredential.user!.uid).set({
@@ -204,7 +200,7 @@ class AuthViewModel extends ChangeNotifier {
         return username;
       }
     }
-    
+
     // Fallback to email prefix
     if (googleUser.email.isNotEmpty) {
       String emailPrefix = googleUser.email.split('@')[0];
@@ -214,7 +210,7 @@ class AuthViewModel extends ChangeNotifier {
         return emailPrefix;
       }
     }
-    
+
     // Final fallback
     return 'user${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
   }
@@ -309,10 +305,14 @@ class AuthViewModel extends ChangeNotifier {
         await _currentUser!.updateDisplayName(username);
         await _currentUser!.reload();
       }
-      if (profileImageUrl != null) updates['profile_image_url'] = profileImageUrl;
+      if (profileImageUrl != null)
+        updates['profile_image_url'] = profileImageUrl;
       if (bio != null) updates['bio'] = bio; // use '' to clear
 
-      await _db.collection('users').doc(uid).set(updates, SetOptions(merge: true));
+      await _db
+          .collection('users')
+          .doc(uid)
+          .set(updates, SetOptions(merge: true));
       return null;
     } catch (e) {
       print("Error updating user profile: $e");
